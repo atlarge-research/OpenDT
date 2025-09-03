@@ -1,0 +1,82 @@
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage[inline]{enumitem}
+\usepackage{textcomp}
+\usepackage{lipsum}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{listings}
+\usepackage{pifont}
+\PassOptionsToPackage{hyphens}{url}\usepackage{hyperref}
+\usepackage{cleveref}
+\setlength{\marginparwidth}{2cm}
+\usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes} % \usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes} to disable the notes
+\usepackage{xargs}                    
+\newcommand{\todocite}[1]{\todo[color=green!40]{#1}}
+\usepackage{tabularray}
+\usepackage{pifont}
+\usepackage{tabularx}
+
+\newcommand\blfootnote[1]{%
+  \begingroup
+  \renewcommand\thefootnote{}\footnote{#1}%
+  \addtocounter{footnote}{-1}%
+  \endgroup
+}
+
+\newcommandx{\todolarge}[2][1=]{\todo[inline,size=\large,linecolor=blue,backgroundcolor=cyan,bordercolor=blue,#1]{#2}}
+\newcommand{\todoother}[1]{\todo[inline, color=cyan!40]{Other: #1}}
+\newcommand{\todoall}[1]{\todo[inline, color=orange!40]{ANYONE: #1}}
+\newcommand{\todoalexandru}[1]{\todo[inline, color=blue!40]{Alexandru: #1}}
+\newcommand{\todoradu}[1]{\todo[inline,color=teal!40]{Radu: #1}}
+\newcommand{\todogleb}[1]{\todo[inline, color=gray!40]{Gleb: #1}}
+\newcommand{\tododomas}[1]{\todo[inline, color=green!40]{Domas: #1}}
+\newcommand{\todomartin}[1]{\todo[inline, color=purple!40]{Martin: #1}}
+\newcommand{\todoisidora}[1]{\todo[inline, color=red!40]{Isidora: #1}}
+
+
+% Citation own system
+\newcommand{\citationstodo}[1]{\textsuperscript{\color{blue} [#1]}}
+% Citation needed
+\newcommand{\citationneeded}{\textsuperscript{\color{blue} [citation needed]}}
+\newcommand{\citationsneeded}[1]{\textsuperscript{\color{blue} [#1 needed]}}
+
+
+%%% \verify, \cut, \addref, \unsure, \change, \info, \improvement, \thiswillnotshow
+\newcommand{\verify}[1]{\todo[inline, color=cyan!40]{check: #1}}
+\newcommand{\cut}[1]{\todo[inline, color=yellow!40,disable]{Cut: #1}}
+\newcommandx{\addref}[2][1=]
+{\todo[inline,linecolor=blue,backgroundcolor=blue!50,bordercolor=blue,#1]{Add reference. #2}}
+\newcommandx{\unsure}[2][1=]{\todo[inline, linecolor=red,backgroundcolor=red!25,bordercolor=red,#1]{#2}}
+\newcommandx{\change}[2][1=]{\todo[inline, linecolor=blue,backgroundcolor=blue!25,bordercolor=blue,#1]{#2}}
+\newcommandx{\info}[2][1=]{\todo[linecolor=OwnOliveGreen,backgroundcolor=OwnOliveGreen!25,bordercolor=OwnOliveGreen,#1]{#2}}
+\newcommandx{\improvement}[2][1=]{\todo[linecolor=Plum,backgroundcolor=Plum!25,bordercolor=Plum,#1]{#2}}
+\newcommandx{\thiswillnotshow}[2][1=]{\todo[disable,#1]{#2}}
+%
+
+\definecolor{darkred}{rgb}{0.5,0,0}
+\definecolor{darkgreen}{rgb}{0,0.5,0}
+\definecolor{darkblue}{rgb}{0,0,0.5}
+\newcommand{\note}[1]{\noindent\textbf{\textsc{\textcolor{darkgreen} {(NOTE: #1)}}}}
+\newcommand{\NOTE}[1]{\noindent\textbf{\textsc{\textcolor{red} {(IMPORTANT: #1)}}}}
+
+\newcommand{\circled}[1]{%
+    \tikz[baseline=(char.base)]{
+        \node[shape=circle, fill=black, text=white, inner sep=0.5pt, font=\small] (char) {#1};
+    }%
+}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\makeatletter
+\setlength{\@fptop}{0pt}
+\makeatother

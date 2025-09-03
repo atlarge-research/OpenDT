@@ -1,0 +1,18 @@
+\begin{table*}[ht]
+\centering
+\caption{Formulas of the power models used in this work. E=experiment (e.g., E1=experiment 1). $P_{idle}$, $P_{max}$ = the power used in idle and full capacity states, $u$ = CPU utilization, $e$ = Euler's Number, $\alpha$ = utilization fraction at which the host becomes asymptotic, $r$ = calibration parameter.}
+\label{table:model-formulas}
+\begin{tblr}{
+  column{5-7} = {c},
+  hline{1-2,9} = {-}{},
+}
+ID  & Name        & Formula  & ~Source & E1                         & E2                         & E3                         \\
+EQ1 & Sqrt        & P(u) = P_{\text{idle}} + (P_{\text{max}} - P_{\text{idle}}) \cdot \sqrt{u} \label{eq:sqrt_power} & \cite{DBLP:conf/iccS/SilvaOCTDS19, DBLP:journals/spe/CalheirosRBRB11, DBLP:conf/ccgrid/MastenbroekAJLB21} & \ding{52} & \ding{52} & \ding{52} \\
+EQ2 & Linear      & P(u) = P_{\text{idle}} + (P_{\text{max}} - P_{\text{idle}}) \cdot u \label{eq:linear_power} \label{eq:linear_power} & \cite{DBLP:conf/iccS/SilvaOCTDS19, DBLP:journals/spe/CalheirosRBRB11, DBLP:conf/ccgrid/MastenbroekAJLB21}  & \ding{56} & \ding{52} & \ding{52} \\
+EQ3 & Square      & P(u) = P_{\text{idle}} + (P_{\text{max}} - P_{\text{idle}}) \cdot u^2 \label{eq:square_power} \label{eq:square_power} & \cite{DBLP:conf/iccS/SilvaOCTDS19, DBLP:journals/spe/CalheirosRBRB11, DBLP:conf/ccgrid/MastenbroekAJLB21}  & \ding{56} & \ding{52} & \ding{52} \\
+EQ4 & Cubic       & P(u) = P_{\text{idle}} + (P_{\text{max}} - P_{\text{idle}}) \cdot u^3 \label{eq:cubic_power} \label{eq:cubic_power} & \cite{DBLP:conf/iccS/SilvaOCTDS19, DBLP:journals/spe/CalheirosRBRB11, DBLP:conf/ccgrid/MastenbroekAJLB21}  & \ding{56} & \ding{52} & \ding{52} \\
+EQ5 & MSE         & P(u) = P_{\text{idle}} + (P_{\text{max}} - P_{\text{idle}}) \cdot (2u - u^r) \label{eq:mse_power} \label{eq:mse_power} & \cite{DBLP:conf/ccgrid/MastenbroekAJLB21, DBLP:conf/isca/FanWB07}  & \ding{52} & \ding{52} & \ding{52} \\
+EQ6 & Asymptotic  & P(u) = P_{\text{idle}} + \frac{(P_{\text{max}} - P_{\text{idle}})}{2} \left \cdot (1 + u - e^{-u/\alpha} \right) \label{eq:asymptotic_power} & \cite{DBLP:conf/ccgrid/MastenbroekAJLB21}  & \ding{52} & \ding{52} & \ding{52} \\
+EQ7 & Asymptotic DVFS & P(u) = P_{\text{idle}} + \frac{(P_{\text{max}} - P_{\text{idle}})}{2} \left \cdot( 1 + u^3 - e^{-u^3/\alpha} \right) \label{eq:asymptotic_power_dvfs} & \cite{DBLP:conf/ccgrid/MastenbroekAJLB21}  & \ding{52} & \ding{52} & \ding{52} 
+\end{tblr}
+\end{table*}

@@ -1,0 +1,29 @@
+\begin{table}
+\centering
+\caption{Workload traces used in experiments. Name is source and collection year (e.g., SURF-22 = source SURF, year 2022). SUO = system under observation, SR = sampling rate, CH = CPU hours (millions), S = scientific, B = business-critical.}
+\label{table:workload-traces}
+\vspace*{-.25cm}
+\begin{adjustbox}{width=\columnwidth,center}
+\begin{tblr}{
+  column{5} = {r},
+  column{6} = {r},
+  column{7} = {r},
+  column{8} = {r},
+  cell{1}{5} = {c},
+  cell{1}{6} = {c},
+  cell{1}{7} = {c},
+  cell{1}{8} = {c},
+  hline{1-2,5} = {-}{},
+}
+% ID  & Name         & Type & SUO & Duration & Jobs  & CH        & SR  \\
+% WT1 & SURF-22      & S    & S1  & 7days    & 7,850 & 310,237   & 30s \\
+% WT2 & Marconi-22   & S    & S2  & 30days   & 8,316 & 4,743,283 & 20s \\
+% WT3 & Solvinity-13 & B    & S3  & 30days   & 50    & 136,127   & 30s 
+ID  & Name         & Type & SUO & Duration & Jobs  & CH        & SR  \\
+WT1 & SURF-22      & S    & S1  & 7\,days    & 7,850 & 0.31   & 30\,s \\
+WT2 & Marconi-22   & S    & S2  & 30\,days   & 8,316 & 4.74   & 20\,s \\
+WT3 & Solvinity-13 & B    & S3  & 30\,days   & 50    & 0.13   & 30\,s 
+\end{tblr}
+\end{adjustbox}
+\vspace*{-.35cm}
+\end{table}

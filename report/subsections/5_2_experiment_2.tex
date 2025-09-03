@@ -1,0 +1,31 @@
+\subsection{Tradeoff analyzed: inference time - model accuracy}\label{sec:experiments:exp2}
+
+% \usepackage{tabularray}
+
+\begin{table}[t]
+\centering
+\caption{SiMo and CoMo measurements of inference metrics.}
+\label{tab:eval:inference-times}
+\begin{tabularx}{\linewidth} {XXXX}
+    \toprule
+    Model & Throughput (samples/sec) & Latency (ms) & Accuracy \\
+    \midrule
+     SiMo  & 5795.50                  & 4.790        & 34.37\%    \\
+CoMo  & 321.63                   & 107.159      & 57.80\%  \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% Paragraph 1 - 100 words
+% - what are thoroughput and accuracy?
+% - why do we choose those metrics?
+% - how do we calculate them?
+Throughput and latency are two key performance metrics in evaluating model inference, widely used by the community to quantify system performance. Throughput measures how many samples a model can process per second, reflecting its efficiency in handling large workloads, while latency quantifies the time required to process a single input, making it crucial for real-time applications. We chose these metrics because they provide insight into both the speed and responsiveness of the models. Throughput is calculated as the batch size divided by the inference time, while latency is derived by measuring the total time taken for a single sample.
+
+% Paragraph 2 - 100 words
+% - what are the results?
+% - what do they suggest?
+% - real-world applicability?
+% - future research?
+The results presented in \Cref{tab:eval:inference-times} indicate a clear trade-off between inference speed and accuracy. SiMo, the simpler model, achieves high throughput (5795.5 samples/sec) and low latency (4.8 ms) but at the cost of accuracy (34.3\%). In contrast, CoMo achieves a significantly higher accuracy (57.8\%) but suffers from lower throughput (321.6 samples/sec) and higher latency (107.2 ms). This tradeoff aligns with our initial hypothesis that the SiMo approach, being optimized for speed, is then more suitable for real-time applications whereas the CoMo approach, prioritizing accuracy, is more applicable in scenarios where precision is the chief concern rather than responsiveness. Future research could explore hybrid approaches that dynamically balance speed and accuracy, potentially adapting model complexity based on real-time constraints.

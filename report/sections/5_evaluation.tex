@@ -1,0 +1,46 @@
+\section{Experiments} \label{sec:experiments} 
+
+\begin{table}[t]
+\centering
+\caption{Hardware setup during training and experimentation.}
+\label{tab:eval:experiment-setup}
+\begin{tabularx}{\linewidth} {XX}
+    \toprule
+    Component & Version \\
+    \midrule
+     GPU & NVIDIA 4070S \\
+        GPU RAM & 12GB \\
+        CUDA & 12.8 \\
+        GPU driver version & 570.86.16 \\
+        CPU & Xeon® E5-2699 v4 \\
+        CPU core count & 22 \\
+        RAM & 256 GB \\
+        Disk bandwidth & 3 GB/s \\
+        OS & Ubuntu 22.04 LTS \\
+        Python & 3.12 \\
+        Linux kernel version & 5.15 \\
+        PyTorch version & 2.6.0 \\
+        PyTorch seed & 42 \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+We design our experiments centered around answering \ref{introduction:mrq}, and evaluating SiMo and CoMo against functional and non-functional requirements. Overall, the experiments support three main findings (MFs):
+
+\begin{enumerate}[label=\textbf{MF\arabic*}]
+\item \label{evaluation:mf1} Larger, more complex models do not guarantee better results. CoMo achieved only 4\% better accuracy than the average individual EfficientNet, but consumed six times more energy.
+\item \label{evaluation:mf2} SiMo achieves 177 times higher throughput than CoMo. However, this comes at the expense of accuracy: 34.3\% for SiMo compared to 57.8\% for CoMo.
+\item \label{evaluation:mf3} CoMo ensemble provides only a slight improvement in accuracy compared to the best individual model, B0: 57.8\% for CoMo, 55.3\% for B0). While in some cases this improvement can be crucial, most of the time this difference is insignificant.
+\end{enumerate}
+
+\subsection{Experiment Setup}
+
+ During training and evaluation, we used a single GPU cluster with a commercial-grade GPU - Nvidia 4070S - and ensured that no other components bottlenecked the GPU performance. Our complete hardware and software experiment setup is summarized in \Cref{tab:eval:experiment-setup}. To ensure that the GPU is not bottlenecked by PyTorch dataloader speed, we selected the dataloader number of workers to 8 - during test runs, this number showed the highest performance - and we set memory pinning to true, ensuring that dataloader memory pages are not swapped out by the OS. Other hardware components, having significantly lower cost to rent than GPUs, were over-provisioned to ensure close to 100\% GPU load during training and inference. 
+ 
+ The selected CPU is Xeon® E5-2699 v4 with 22 cores - significantly higher than required by the data-loader - and the selected RAM size is 256. To ensure that I/O operations do not bottleneck the data loader, we selected storage with 3 GB/s bandwidth. We used pre-installed by the cluster provider CUDA 12.8, and the driver version is 570.86.16. For OS, we selected Linux Ubuntu. Both OS and PyTorch were of the latest stable version at the beginning of the project - Ubuntu 22.04 LTS with 5.15 Linux kernel version and PyTorch 2.6.0. To validate the experimental setup, we used the wandb framework, recording all CPU, RAM, and GPU loads and GPU energy metrics. 
+ 
+ Throughout training, we recorded both training and validation loss and accuracy to ensure optimal hyperparameter selection. After training all models, we collected their accuracy metrics using the test dataset split. For reproducibility purposes, we keep PyTorch constant at 42 throughout the experimentation process \ref{FR3}. 
+
+\input{subsections/5_1_experiment_1}
+\input{subsections/5_2_experiment_2}
+\input{subsections/5_3_experiment_3}

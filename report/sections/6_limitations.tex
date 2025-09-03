@@ -1,0 +1,12 @@
+\section{Limitations and Threats to validity} \label{sec:limitations}
+Despite the insights provided by this study, several limitations and potential threats to validity must be acknowledged. These limitations arise mainly from computational constraints, yet also from the (restricted) scope of this work.
+
+Training deep learning models to full convergence often requires substantial computational resources. Due to limited hardware capability, we were unable to train CoMo until full convergence. Instead, we estimated its final performance based on observed baseline trends. While this approach provides a reasonable approximation, it introduces a source of potential inaccuracy. It is possible that additional training epochs could have led to improved performance or different trade-offs between accuracy and computational cost.
+
+SiMo was designed based on our own selection criteria rather than an established, peer-reviewed baseline. Our intent was to create a simple yet functional model for comparison, but there is no universally accepted definition of what makes a model "simple". Different architectural choices could lead to different performance trade-offs, potentially affecting our conclusions.
+
+The way CoMo aggregates predictions from multiple models is just one of many possible ensemble techniques. In this study, we employed a statistical aggregation method (arithmetic mean), but alternative approaches could potentially yield different performance characteristics.
+
+While these limitations do not undermine the validity of our core findings, they highlight areas where additional exploration is needed. Future research (expanded in section \Cref{sec:conclusion}) into these topics could provide deeper insights into the relationship between architectural complexity, accuracy, and computational efficiency.
+
+%To Radu, maybe you will now how to connect this and conclusion sections better, feel free to remove, add, change, we got this <3

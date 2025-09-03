@@ -1,0 +1,20 @@
+\section{Conclusion and Future Work} \label{sec:conclusion}
+
+Artificial Intelligence is becoming increasingly indispensable across industry, government, and academia but at considerable financial cost and with little attention to sustainability. To address this challenge, researchers and engineers sacrifice performance for complexity and vice-versa, yet there is a lack of analysis in the community of the impacts of these trade-offs. In this work, we designed, implemented, and evaluated two contrasting architectural models, SiMo (Simple architectural Model) and CoMo (Complex architectural Model), trained for object classification and systematically analyzed trade-offs through three experiments. Our key findings from the experiments are i) SiMo achieved a significantly higher throughput (5,795.5 samples/second), yet with a lower accuracy (34.4\%), while CoMo achieved only 321.6 samples/second, yet with an accuracy of 57.8\%; ii) CoMo consumed around six times more energy during training than SiMo, reaching a 23.5\% higher accuracy; iii) EfficientNet-B0 emerges as the best-balanced sub-model used by CoMo, offering an accuracy of 55.3\% with moderate resource usage.
+
+This research represents only a first step towards a complexity-performance-sustainability tradeoff analysis. We envision future work in evaluating such impacts of larger, massive-scale models, used by millions, and open to the public at large (e.g., LLM services). We also envision future research towards exploring hybrid approaches, with disabled models in the aggregation step, both during the training and inference periods. We argue that even a one-digit improvement in these large-scale, widely used models could have massive financial, sustainability, and performance impacts.
+
+% Understanding the performance and climate impact of existing and, more importantly, upcoming datacenters is essential to our society and economy. 
+% Although datacenter operators already use simulators to predict infrastructure capabilities, current simulators often rely on single models, which are insufficient for reliable predictions under diverse scenarios. %This can cascade in unstable infrastructure, with higher-than-expected energy consumption and CO2 emissions.
+% %Addressing this gap, in this work we have 
+ 
+% In this work, we have designed, implemented, and evaluated M3SA, a framework for multi- and meta-model simulation and analysis of datacenters. 
+% % We synthesized requirements and designed a system to leverage multiple models into a Multi-Model, and to aggregate them into a novel Meta-Model. % says the same thing as the previous sentence.
+% We prototyped M3SA and evaluated it using real-world workload and carbon-emission traces, demonstrating M3SA's ability to predict in complex scenarios, with enhanced explainability and robustness over approaches that only use single models (even hand-tuned). 
+% Such capabilities can aid analysts and C-level decision-makers to better reason about real-world scenarios and make informed decisions. Results show that M3SA's can simulate years of datacenter operation in minutes, with a 50\% lower error rate than single-model-based predictions, while enabling detailed explanation and without significant overheads. We also showcase how M3SA can simulate system failures and contribute to CO2-aware workload migration and scheduling, reducing CO2 emissions significantly when considering datacenters' geographical location.
+
+% We have released M3SA as an open-sourced system that can be applied as a top layer to datacenter simulators and tested its operation with the commonly used open-source simulator OpenDC. We envision future research in employing AI/ML techniques in the Meta-Model aggregation function 
+% and are currently embedding M3SA into a digital twinning simulation system in a major infrastructure project with over 75 partner institutions.
+
+
+
