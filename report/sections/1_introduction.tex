@@ -1,58 +1,51 @@
 \section{Introduction} \label{sec:introduction}
 
+Our digitalised society and economy rely increasingly on digital services. Correspondingly, new datacenters are being built, and existing datacenters are scaled up~\cite{DBLP:journals/corr/abs-2206-03259, nicolae5377101m3sa, DBLP:conf/sc/AndreadisVMI18, market:IDC24AI}. Regarded as a state-of-the-art practice in the community, operators use simulation for designing and operating datacenters~\cite{DBLP:journals/corr/abs-2206-03259, nicolae5377101m3sa, DBLP:conf/ccgrid/MastenbroekAJLB21}, thus allowing experimentation in a time and cost-efficient way~\cite{Iosup2024DigitalTwins, DBLP:conf/ccgrid/MastenbroekAJLB21}. For example, in the European project Graph Massivizer, simulators predict speedup, failure cost, energy consumption, and CO2 emissions for massive-scale infrastructure~\cite{nicolae5377101m3sa, DBLP:conf/compsac/MolanKBTPCIRRVP23, DBLP:conf/wosp/IosupPVTMHZBFK23, DBLP:conf/wosp/Sanchez0RP23}. Simulating massive-scale distributed computer ecosystems under workload is a critical, yet non-trivial task due to the peculiar behaviour of various hardware and software layers of the ecosystem when under operational phenomena~\cite{DBLP:conf/wosp/ChuTVI23, DBLP:conf/ccgrid/KondoJIE10}; addressing this challenge, multiple simulators have been proposed over the past decades, such as the open-source OpenDC~\cite{DBLP:conf/ccgrid/MastenbroekAJLB21}, Kavier~\cite{Nicolae2025BSc}, CloudSim~\cite{DBLP:journals/spe/CalheirosRBRB11}, or DCSim~\cite{DBLP:conf/cnsm/TigheKBL12}. 
+Although existing simulators are still valuable for simulating datacenters under workload, in ICT, there is currently no closed-loop operational ecosystem adopting a physical-digital-twinning workflow that continuously ingests live telemetry, updates the digital twin, and actuates the physical infrastructure based on SLO-aware simulation feedback. To address this operational gap, datacenter operators manually intervene or adopt static thresholds, often resulting in delayed and inefficient decisions, cascading into violations of Service Level Objective (SLO) and low Quality of Service (QoS)~\citationsneeded{2}. Addressing this gap, in this work, we design, prototype, and evaluate \underline{OpenDT}, the first \underline{Open}-source \underline{D}igital \underline{T}winning operational ecosystem for datacenters.
 
+\Cref{fig:high-level-element} illustrates a high-level design of OpenDT, which involves continuous communication between a physical twin (left) and a digital twin (right), adapted with permission from~\cite{Iosup2024DigitalTwins}. The physical twin collects telemetry data and communicates with the digital twin, which, through simulation-based and SLO-oriented analysis, steers the physical ICT infrastructure. 
 
-Our society and economy are increasingly dependent on Artificial Intelligence (AI). Correspondingly, AI models are becoming more accessible to the public at large while leveraging more complex architectures and consuming significant computational resources \cite{strubell-etal-2019-energy, strubell2020energy, yarally2023uncovering}. AI workloads raise significant sustainability concerns, thus exacerbating the already over-exploited resources of our planet \cite{buchholz_extreme_2024, schwartz2020green, dhar2020carbon}. Besides, AI workloads raise economic concerns with training and inference of massive-scale models in the scale of hundreds of millions of dollars in compute resources \cite{patterson2021carbon, schwartz2020green}. For example, the cost of training GPT 4.5 is estimated at \$500 million \cite{villalobos_how_2024}, Gemini 2.0 at \$200-300 million \cite{yogatama_economics_2025}, and DeepSeek R1 at \$50-80 million \cite{yogatama_economics_2025}.
 
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.98\linewidth]{figures/figure1-simo-como-hi-level.pdf}
-    \vspace{-0.2cm}
-    \caption{SiMo uses a simple architecture for prediction, while CoMo aggregates multiple complex models; architectural difference cascade into different accuracies and different computational resources.}
+    \includegraphics[width=0.98\linewidth]{report/figures/high-level-overview-dt-pt.pdf}
+    \vspace*{-0.2cm}
+    \caption{High-level overview of datacenter digital twinning system. The Physical ICT infrastructure collects telemetry data and directs it to the Digital ICT infrastructure, which, through simulation, offers back adjustment feedback best-aligned with the active SLOs. A human in the loop oversees the process and ensures the correctness and ethicality of the process. Adapted with permission from~\cite{Iosup2024DigitalTwins}.}
     \label{fig:high-level-element}
-    \vspace{-0.6cm}
+
+    \vspace*{-0.7cm}
 \end{figure}
 
-\begin{figure*}
-    \centering
-    \includegraphics[width=0.95\linewidth]{figures/f2.png}
-    \caption{EfficientNet architecture, for B0-B7, extracted from~\cite{luntz1969estimation}. In this work, we leverage and aggregate B0-B3 into CoMo.}
-    \label{fig:background:f2}
-\end{figure*}
+% \begin{itemize}
+%     \item A data-driven digital shadow of a SURF datacenter that replays real workloads, visualizes power \& CO$_2$, and proposes simulation-based mitigations when issues arise.
+%     \item Datacenter-level view (scheduler $\rightarrow$ nodes $\rightarrow$ jobs), representing how tasks are placed and executed across CPU/GPU nodes.
+%     \item Public SURF traces (jobs + node telemetry) with timestamps enabling time-aligned replay; dataset available on Zenodo.
+%     \item Simulation for decision support, ``what-if'' scenarios for failures, overloads, or carbon-aware scheduling (e.g., rescheduling a hot rack, delaying non-urgent jobs to lower-CO$_2$ windows, or shifting CPU/GPU placement) \textcolor{red}{TBD}
+%     \item Understand how the real datacenter manages tasks over time, reduce energy/CO$_2$, and improve resilience
+%     \item Use ML to forecast near-term load/power and CO$_2$, detect anomalies or impending failures, or recommend carbon-aware scheduling actions that cut energy and improve resilience. \textcolor{red}{TBD}
+% \end{itemize}
 
-To address the high environmental and financial cost, researchers and engineers analyze tradeoffs between employing simple architectural models, involving less computational expenses, yet having poor(er) accuracy, and employing complex architectural models, with better accuracy, yet with high computational expenses. These tradeoffs are encountered both in phases of training and inference, especially when the systems are scaled to millions of users. Object recognition is an increasingly common  application, with significant practical relevance in emerging and evolving fields of metaverse \cite{2024-hotcloudperf-metaverse-trace, 2023-hotcloudperf-metaverse}, augmented reality \cite{grigorescu2020survey, tomtom_augmented_2023}, or autonomous driving \cite{mao20233d}. In these fields, the current state-of-the-art involves adopting complex-architectural models, which offer higher accuracy at the cost of increased computational resources, energy consumption, and financial investment, without systematically exploring a middle ground in the complexity spectrum \cite{krishna2023complementary, schwenker20013d}. Addressing this gap, in this work, we design, prototype, and evaluate two contrasting architectural models for object recognition: SiMo and CoMo. 
+Digital twinning ICT infrastructure is a novelty in computer systems and is innovative beyond the science of computer systems. However, in large-scale sciences such as aviation and space exploration, digital twins have been successfully used for decades, providing course-grained and dynamic adjustment the physical twin (e.g., airplanes, spaceships), from a distance, without physical access to the physical twin, yet only with operational access to the physical twin for dynamic adjustments aided by simulators coupled with live telemetry~\citationsneeded{3}. In small-scale sciences, such as applied biomedicine in cardiovascular health, digital twinning (eco)systems use patient-specific live telemetry (e.g., fusing imaging (e.g., MRI, CT), biosignals (e.g., ECG, electrocardiographic imaging)), and detailed physics-based electrophysiology simulation to predict treatment. ~\cite{sel2024building}. In contrast, to adopt a digital twinning operational ecosystem for complex datacenter ecosystems, medium-scale telemetry and models must combine higher-level abstraction with detailed monitoring and operational models for specific devices, applications, while addressing various operational phenomena~\cite{nicolae5377101m3sa}. This is fundamentally different from other-scale sciences~\cite{allen2019hierarchy, nicolae5377101m3sa}.
 
-Figure 1 illustrates our approach through an analogy. SiMo and CoMo receive an image for prediction (e.g., a donkey). SiMo, prioritizing performance over accuracy and unable to distinguish small nuances, predicts \textit{horse}, using minimal time and computational resources. CoMo, prioritizing accuracy over performance, predicts \textit{donkey} but uses more time and computational resources. 
+In this work, we address the open challenge of \textit{monitoring and operating massive-scale computer ecosystems through digital twinning}, by designing OpenDT, a first-of-its-kind ecosystem for datacenter digital twinning, implementing a prototype of the scientific instrument, and evaluating with realistic, trace-based experimentation scenarios. Adhering to the community-vetted, state-of-the-art AtLarge vision on researching distributed systems and ecosystems~\cite{iosup2019atlarge}, this paper contains a three-fold contribution:
 
-\textit{Open challenge: The lack of tradeoff analysis, especially in the application domain of object recognition using AI / ML.} This raises the main research question (MRQ):
 
-\begin{enumerate}[label=\textbf{MRQ}]
-\item \label{introduction:mrq} How to explore the impact of architectural complexity on the accuracy and performance of deep learning models?
-\end{enumerate}
-
-To answer MRQ, we formulate three research questions (RQ) and centralize our research towards answering:
-
-\begin{enumerate}[label=\textbf{RQ\arabic*}]
-\item \label{introduction:rq1} How to design a simple- (SiMo) and a complex- (CoMo) architectural deep learning model for object classification?
-\item \label{introduction:rq2} How to prototype SiMo and CoMo?
-\item \label{introduction:rq3} How to evaluate and compare SiMo and CoMo?
-\end{enumerate}
-
-\textit{Approach and main contribution:} In this work, we address the open challenge by designing, implementing, and evaluating the tradeoff between SiMo and CoMo with a three-fold contribution:
+% \todoall{There is currently no reference architecture of a digital twin. This is an issue: an ecosystem for distributed computer ecosystems can only be rigorously designed if it can be mapped to an existent, preferably also peer-reviewed, reference architecture... We can also play "the scientist" game, but this design otherwise is not robust science...}
 
 \begin{enumerate}[label=\textbf{C\arabic*}]
-\item \label{introduction:c1} (\textbf{Design}) We design SiMo and CoMo, two AI models with different architectural complexities for object classification (\Cref{sec:design}). We formulate functional and non-functional requirements and propose an overall architecture for SiMo and CoMo. SiMo employs a lightweight CNN architecture aimed for efficiency, while CoMo leverages an ensemble of 4 pretrained models to maximize accuracy.
+\item \label{introduction:c1} (\textbf{Design}) We design OpenDT (steps 1-4 from \cite{iosup2019atlarge}, the first \underline{open}-source operational ecosystem for \underline{d}igital \underline{t}winning datacenters (\Cref{sec:design}). We formulate functional and non-functional requirements, then analyze design choices of OpenDT against the established requirements. We further the design of OpenDT and propose an operational workflow for the digital twinning ecosystem. We design the simulator component as generic, integrable with discrete-event simulators. Overall, OpenDT is modular and allows for each component to have various internal designs and implementations.
 
-\item \label{introduction:c2} (\textbf{Experimentation}) 
-We obtain an open-source, peer-reviewed dataset for object classification, select methods for data augmentation, and split the result into train-validation-test sets (\Cref{sec:implementation:collection}, \ref{sec:implementation:augmentation}, \ref{sec:implementation:division}). We engineer a prototype of SiMo and CoMo, and train models (\Cref{sec:implementation:training}). The three experiments: (i) Evaluate the trade-off between training resources and model accuracy (\Cref{sec:experiments:exp1}); (ii) Analyze the tradeoff between inference time and prediction accuracy (\Cref{sec:experiments:exp2}); (iii) Compare the accuracy of individual models aggregated by CoMo with the composite, complex model itself (\Cref{sec:experiments:exp3}). 
+\item \label{introduction:c2} (\textbf{Prototype and experimentation}) 
+We prototype OpenDT in \Cref{sec:prototype} (step 5 from \cite{iosup2019atlarge}). For the simulation component, OpenDT integrates OpenDC~\cite{DBLP:conf/ccgrid/MastenbroekAJLB21}, a peer-reviewed, state-of-the-art datacenter simulator, with over 8 years of operational experience and employed in national-scale projects (e.g., 6G Future Network Services~\cite{FutureNetworkServices2025}) and European-scale projects (e.g., Graph Massivizer~\cite{GraphMassivizer2025}). Then, in \Cref{sec:experiments}, we conduct three experiments (step 6 and 7~\cite{iosup2019atlarge}) aided by OpenDT to: (i) exp 1 (maybe show a real-world scenario and how digital twinning be better than just simulation), (ii) exp 2 (tbd), (iii) exp 3 (tbd). Overall, OpenDT enables ... 
+\todoall{add findings here}.
 
 \item \label{introduction:c3} (\textbf{Open Science}) 
-We obtain an open-source, peer-reviewed dataset for object classification, select methods for the data used and created in this project. We release both SiMo and CoMo implementations together with training and evaluation scripts to ensure reproducible science. We also make available our training and evaluation scripts and provide a dataset tailored for object classification used in this work. Lastly, we make available the interactive results overview \footnote{\url{https://wandb.ai/fzovpec/ml_project}} that also includes the model weights samples every 20 training epochs, allowing for full experiment reproducibility following the principles of open science.
+ yWe contribute to open science all the software and data used and created in this project. We engineer OpenDT in (todo add the language), coupled with OpenDC, and with a demonstrational telemetry and feedback system, all supervised by a human-in-the-loop. For the experimentation phase, we use real-world traces collected from SURF~\footnote{\url{https://www.surf.nl}}, the largest datacenter provider in the Netherlands, align with OpenDT and OpenDT input requirements, and release the resulting input and output set as a FAIR dataset. Last, make available the complete reproducibility capsule: \todoall{actually make this capsule and add the link here.}
 
 
 \end{enumerate}
-
+ 
 
 
 
