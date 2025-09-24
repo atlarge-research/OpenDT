@@ -4,7 +4,7 @@ import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType
 
 import java.sql.Timestamp
 
-case class Task(id: Long, submission_time: Timestamp, duration: Long,
+case class Task(id: String, submission_time: Timestamp, duration: Long,
                 cpu_count: Int, cpu_capacity: Double, mem_capacity: Long)
 
 case class Fragment(id: String, duration: Long, cpu_count: Int, cpu_usage: Double)

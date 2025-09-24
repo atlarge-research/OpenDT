@@ -16,13 +16,9 @@ lazy val root = (project in file("."))
 libraryDependencies ++= Seq(
     "org.apache.spark" %% "spark-core" % spark % "provided",
     "org.apache.spark" %% "spark-sql"  % spark % "provided",
-    // add if you use it:
-    // "org.apache.spark" %% "spark-sql-kafka-0-10" % spark
+    "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+    "org.postgresql" % "postgresql" % "42.7.8" % "provided",
+    "org.apache.spark" %% "spark-sql-kafka-0-10" % spark % "provided"
 )
 
-libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % scalaVersion.value
-)
-
-
-Compile / mainClass := Some("org.opendt.Main")
+Compile / mainClass := Some("org.opendt.TelemetrySim")
