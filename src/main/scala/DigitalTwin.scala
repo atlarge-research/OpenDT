@@ -12,7 +12,6 @@ import java.time.format.DateTimeFormatter
 import scala.language.postfixOps
 
 object DigitalTwin {
-
     private val WINDOW_DUR = s"${Config.WINDOW_SIZE_MS + 1} milliseconds"
     private val SLIDE_DUR  = s"2000 milliseconds"
 
@@ -52,7 +51,9 @@ object DigitalTwin {
         val fragments = createKafkaReadStream[OpenDTFragment](spark, Config.FRAGMENTS_TOPIC, "id")
             .as("f")
 
+        var win = 1;
         var i = 0;
+
 
         tasks
             .join(fragments, tasks("id") === fragments("id"), "inner")
@@ -101,13 +102,14 @@ object DigitalTwin {
                             .mode("overwrite")
                             .parquet(s"${base}/fragments")
 
-                        currFragments.groupBy("submission_time").count().orderBy("submission_time").show(100)
+                        //currFragments.groupBy("submission_time").count().orderBy("submission_time").show(100)
 
                         val tasks = records
                             .select(col("t.*"))
+                            .dropDuplicates("id")
                             .withColumn(
-                                "submission_time",
-                                when(col("submission_time") > wStart, col("submission_time")).otherwise(wStart)
+                                "duration",
+                                col("duration") - lit(Config.WINDOW_SIZE_MS * win)
                             )
                             .withColumn("submission_time", from_utc_timestamp(col("submission_time"), "UTC"))
                             .as[Task]
@@ -120,6 +122,7 @@ object DigitalTwin {
                             .parquet(s"${base}/tasks")
 
                         println(s"record ${wStart}-${wEnd} written")
+                        win += 1
                     }
                 println(s"Processing batch $i finished")
                 i += 1
