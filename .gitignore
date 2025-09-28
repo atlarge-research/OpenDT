@@ -49,3 +49,7 @@ build/
 
 ### OpenDT traces ###
 surf-22/
+
+### Kafka data ###
+kafka/kafka-data/
+reader/
