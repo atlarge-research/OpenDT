@@ -1,0 +1,35 @@
+\documentclass[conference]{IEEEtran}
+
+\input{utils/setup}
+\begin{document}
+
+\newpage
+\title{OpenDT: \underline{Open}-source \underline{D}igital \underline{T}winning Instrument for Monitoring and Operating Datacenters}
+
+% How to design, implement, and evaluate an integrated system for digital twinning performance and sustainability of datacenters?
+\input{utils/authors}
+
+
+\maketitle
+\thispagestyle{plain}
+\pagestyle{plain}
+
+\input{sections/0_abstract} 
+
+{
+  \renewcommand{\thefootnote}{}
+  \footnotetext{\textit{* All authors contributed equally to this work.}}
+  \footnotetext{\textit{** This project is based on ongoing research with AtLarge Research Group, of which Radu Nicolae is a member, on ICT digital twinning~\cite{DBLP:journals/corr/abs-2206-03259, Iosup2024DigitalTwins, DBLP:conf/compsac/MolanKBTPCIRRVP23, DBLP:conf/wosp/IosupPVTMHZBFK23}}. We plan future scientific work with AtLarge on ICT Digital Twins. Many thanks (especially) to Alexandru Iosup, Jesse Donkervliet, Tiziano de Matteis, Dante Niewehuis, Vincent van Beek (todo add everyone involved!), all the directly and indirectly involved members from AtLarge, and our collaborators and sponsors.}
+  \renewcommand{\thefootnote}{\arabic{footnote}}
+}
+
+\input{report/sections/1_introduction}
+\input{report/sections/2_background}
+\input{report/sections/3_design}
+\input{report/sections/4_prototype}
+\input{report/sections/5_experiments}
+
+\bibliographystyle{ieeetr}
+\bibliography{main}
+
+\end{document}

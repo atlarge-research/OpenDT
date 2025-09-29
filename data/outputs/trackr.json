@@ -1,0 +1,204 @@
+[{
+    "name": "outputs/",
+    "outputFolder": "data/",
+    "topology": {
+        "pathToFile": "data/topologies/datacenter.json"
+    },
+    "workload": {
+        "pathToFile": "data/workload_traces/surf_new",
+        "type": "ComputeWorkload"
+    },
+    "exportModel": {
+        "exportInterval": 150,
+        "printFrequency": 30000,
+        "computeExportConfig": {
+            "hostExportColumns": [
+                "power_draw",
+                "energy_usage",
+                "cpu_usage",
+                "cpu_utilization",
+                "host_name",
+                "cluster_name",
+                "timestamp",
+                "timestamp_absolute"
+            ],
+            "taskExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "task_id",
+                "task_name",
+                "host_name",
+                "mem_capacity",
+                "cpu_count",
+                "cpu_limit",
+                "cpu_usage",
+                "cpu_demand",
+                "cpu_time_active",
+                "cpu_time_idle",
+                "cpu_time_steal",
+                "cpu_time_lost",
+                "gpu_count",
+                "gpu_limit",
+                "gpu_usage",
+                "gpu_demand",
+                "gpu_time_active",
+                "gpu_time_idle",
+                "gpu_time_steal",
+                "gpu_time_lost",
+                "uptime",
+                "downtime",
+                "num_failures",
+                "num_pauses",
+                "schedule_time",
+                "submission_time",
+                "finish_time",
+                "task_state"
+            ],
+            "powerSourceExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "source_name",
+                "cluster_name",
+                "power_draw",
+                "energy_usage",
+                "carbon_intensity",
+                "carbon_emission"
+            ],
+            "batteryExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "battery_name",
+                "cluster_name",
+                "power_draw",
+                "energy_usage",
+                "embodied_carbon_emission",
+                "charge",
+                "capacity",
+                "battery_state"
+            ],
+            "serviceExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "hosts_up",
+                "hosts_down",
+                "tasks_total",
+                "tasks_pending",
+                "tasks_active",
+                "tasks_completed",
+                "tasks_terminated"
+            ]
+        },
+        "filesToExport": [
+            "host"
+        ],
+        "filesToExportDict": {
+            "host": true,
+            "task": false,
+            "powerSource": false,
+            "battery": false,
+            "service": false
+        }
+    }
+},
+{
+    "name": "outputs/",
+    "outputFolder": "data/",
+    "topology": {
+        "pathToFile": "data/topologies/datacenter2.json"
+    },
+    "workload": {
+        "pathToFile": "data/workload_traces/surf_new",
+        "type": "ComputeWorkload"
+    },
+    "exportModel": {
+        "exportInterval": 150,
+        "printFrequency": 30000,
+        "computeExportConfig": {
+            "hostExportColumns": [
+                "power_draw",
+                "energy_usage",
+                "cpu_usage",
+                "cpu_utilization",
+                "host_name",
+                "cluster_name",
+                "timestamp",
+                "timestamp_absolute"
+            ],
+            "taskExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "task_id",
+                "task_name",
+                "host_name",
+                "mem_capacity",
+                "cpu_count",
+                "cpu_limit",
+                "cpu_usage",
+                "cpu_demand",
+                "cpu_time_active",
+                "cpu_time_idle",
+                "cpu_time_steal",
+                "cpu_time_lost",
+                "gpu_count",
+                "gpu_limit",
+                "gpu_usage",
+                "gpu_demand",
+                "gpu_time_active",
+                "gpu_time_idle",
+                "gpu_time_steal",
+                "gpu_time_lost",
+                "uptime",
+                "downtime",
+                "num_failures",
+                "num_pauses",
+                "schedule_time",
+                "submission_time",
+                "finish_time",
+                "task_state"
+            ],
+            "powerSourceExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "source_name",
+                "cluster_name",
+                "power_draw",
+                "energy_usage",
+                "carbon_intensity",
+                "carbon_emission"
+            ],
+            "batteryExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "battery_name",
+                "cluster_name",
+                "power_draw",
+                "energy_usage",
+                "embodied_carbon_emission",
+                "charge",
+                "capacity",
+                "battery_state"
+            ],
+            "serviceExportColumns": [
+                "timestamp",
+                "timestamp_absolute",
+                "hosts_up",
+                "hosts_down",
+                "tasks_total",
+                "tasks_pending",
+                "tasks_active",
+                "tasks_completed",
+                "tasks_terminated"
+            ]
+        },
+        "filesToExport": [
+            "host"
+        ],
+        "filesToExportDict": {
+            "host": true,
+            "task": false,
+            "powerSource": false,
+            "battery": false,
+            "service": false
+        }
+    }
+}]
