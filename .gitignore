@@ -56,3 +56,7 @@ experiment.json
 kafka/opendt_sim_inputs/
 opendt_sim_inputs/
 output/
+
+### Kafka data ###
+kafka/kafka-data/
+reader/
