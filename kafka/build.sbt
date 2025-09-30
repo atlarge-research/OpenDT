@@ -17,8 +17,13 @@ libraryDependencies ++= Seq(
     "org.apache.spark" %% "spark-core" % spark % "provided",
     "org.apache.spark" %% "spark-sql"  % spark % "provided",
     "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-    "org.postgresql" % "postgresql" % "42.7.8" % "provided",
-    "org.apache.spark" %% "spark-sql-kafka-0-10" % spark % "provided"
+    "org.apache.spark" %% "spark-sql-kafka-0-10" % spark % "provided",
+    "io.circe" %% "circe-core"    % "0.14.14" % "provided",
+    "io.circe" %% "circe-generic" % "0.14.14" % "provided",
+    "io.circe" %% "circe-parser"  % "0.14.14" % "provided",
+    "com.databricks" %% "databricks-dbutils-scala" % "0.1.4" % "provided"
 )
+
+scalacOptions += "-language:postfixOps"
 
 Compile / mainClass := Some("org.opendt.TelemetrySim")

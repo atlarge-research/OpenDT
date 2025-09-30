@@ -1,22 +1,21 @@
-package org.opendt
+package opendt
 
-import opendt.{Config, Schemas}
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{Dataset, Encoder, Row, SparkSession}
 
 import java.sql.Timestamp
 import java.time.Duration
 import java.util.Properties
-import scala.collection.mutable.ArrayBuffer
 
 
 object TelemetrySim {
 
     private var traceStart: Timestamp = _
 
-    private def startStreamingKafka(topicName: String, dataFrame: DataFrame, primaryKeys: String*): Unit = {
+    private def startStreamingKafka[T](topicName: String, dataFrame: Dataset[T], primaryKeys: String*): Unit = {
         val keyCols   = primaryKeys.map(col)
         val valueCols = dataFrame.columns.filterNot(primaryKeys.contains).map(col)
 
@@ -36,9 +35,6 @@ object TelemetrySim {
             val producer = new KafkaProducer[String, String](props)
             var currSt = traceStart
 
-            var i = 0L
-
-            //var rows = ArrayBuffer[Row]()
             rows.foreach(row => {
                 val st: Timestamp = row.getAs("submission_time")
 
@@ -59,6 +55,14 @@ object TelemetrySim {
         }
     }
 
+    private def loadData[T: Encoder](spark: SparkSession, file: String, schema: StructType): Dataset[T] = {
+        spark.read
+            .schema(schema)
+            .parquet(file)
+            .withColumn("id", col("id").cast("int"))
+            .as[T]
+    }
+
     def main(args: Array[String]): Unit = {
         val tasks_fname     = args(0)
         val fragments_fname = args(1)
@@ -70,41 +74,44 @@ object TelemetrySim {
 
         spark.sparkContext.setLogLevel("WARN")
 
-        val tasks: DataFrame     = spark.read.schema(Schemas.tasksSchema).parquet(tasks_fname)
-        var fragments: DataFrame = spark.read.schema(Schemas.fragmentSchema).parquet(fragments_fname)
+        import spark.implicits._
 
-        fragments  =
-            fragments
-                .select(col("*"), monotonically_increasing_id().as("surrogate"))
-                .withColumn("seq", row_number().over(Window.partitionBy(col("id")).orderBy(col("surrogate"))))
-                .drop("surrogate")
+        val tasks: Dataset[Task] = loadData[Task](spark, tasks_fname, Schemas.tasksSchema)
+        val fragments: Dataset[Fragment] = loadData[Fragment](spark, fragments_fname, Schemas.fragmentSchema)
 
         val rollingWindow = Window.partitionBy(col("id")).orderBy(col("seq"))
             .rowsBetween(Window.unboundedPreceding, -1)
 
-        fragments = fragments.withColumn(
-            "durationRelToTask",
-            coalesce(sum(col("duration")).over(rollingWindow), lit(0L))
-        ).drop("seq")
+        var fragmentsDf  =
+            fragments
+                .select(col("*"), monotonically_increasing_id().as("surrogate"))
+                .withColumn("seq", row_number().over(Window.partitionBy(col("id")).orderBy(col("surrogate"))))
+                .drop("surrogate")
+                .withColumn(
+                    "durationRelToTask",
+                    coalesce(sum(col("duration")).over(rollingWindow), lit(0L))
+                )
+                .drop("seq")
 
         val tasksProj = tasks.select(
             col("id").as("task_id"),
             col("submission_time")
         )
 
-        fragments = fragments
+        fragmentsDf = fragmentsDf
             .join(tasksProj, fragments("id") === tasksProj("task_id"))
             .drop("task_id")
 
-        fragments = fragments
+        val openDTFragments = fragmentsDf
             .withColumn("start_time", expr("timestampadd(MILLISECOND, (CAST(duration AS BIGINT) + CAST(durationRelToTask AS BIGINT)), submission_time)"))
             .drop("submission_time")
             .withColumnRenamed("start_time", "submission_time")
             .drop("durationRelToTask")
+            .as[OpenDTFragment]
 
         traceStart = tasks.select(col("submission_time")).agg(min("submission_time")).first().getTimestamp(0)
         val tasksStream = new Thread(() => startStreamingKafka(Config.TASKS_TOPIC, tasks, "id"))
-        val fragmentsStream = new Thread(() => startStreamingKafka(Config.FRAGMENTS_TOPIC, fragments, "id"))
+        val fragmentsStream = new Thread(() => startStreamingKafka(Config.FRAGMENTS_TOPIC, openDTFragments, "id"))
 
         tasksStream.start()
         fragmentsStream.start()
@@ -112,5 +119,5 @@ object TelemetrySim {
         tasksStream.join()
         fragmentsStream.join()
         spark.stop()
-        }
+    }
 }

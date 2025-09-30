@@ -7,18 +7,18 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Dataset, Encoder, SparkSession}
 
 import java.sql.Timestamp
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
+import java.util.concurrent.Executors
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 
 object DigitalTwin {
     private val WINDOW_DUR = s"${Config.WINDOW_SIZE_MS + 1} milliseconds"
     private val SLIDE_DUR  = s"2000 milliseconds"
 
-    private def createKafkaReadStream[T: Encoder](spark: SparkSession, topic: String, idFields: String*): Dataset[T] = {
-        val schema = implicitly[Encoder[T]].schema
-        val idSchema     = StructType(schema.fields.filter(f => idFields.contains(f.name)))
-        val valueSchema  = StructType(schema.fields.filterNot(f => idFields.contains(f.name)))
+    private def createKafkaReadStream[T: Encoder](spark: SparkSession, topic: String, schema: StructType, idFields: String*): Dataset[T] = {
+        val idSchema = StructType(schema.fields.filter{f => idFields.contains(f.name)})
+        val valueSchema = StructType(schema.fields.filterNot{f => idFields.contains(f.name)})
 
         spark.readStream
             .format("kafka")
@@ -39,21 +39,32 @@ object DigitalTwin {
             .master("local[*]")
             .getOrCreate()
 
+        val openDcPath = args(0)
+        val experimentTemplatePath = args(1)
+        val topologyTemplatePath = args(2)
+
+        val topologyRecommender: TopologyRecommender =
+            TopologyRecommender(spark, openDcPath, experimentTemplatePath, topologyTemplatePath)
+
+        spark.conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MILLIS")
+
         spark.sparkContext.setLogLevel("WARN")
         Logger.getLogger("org.apache.spark.sql.execution.streaming.state.HDFSBackedStateStoreProvider")
             .setLevel(Level.ERROR)
 
+        val ec: ExecutionContext =
+            ExecutionContext.fromExecutor(Executors.newFixedThreadPool(1))
+
         import spark.implicits._
 
-        val tasks = createKafkaReadStream[Task](spark, Config.TASKS_TOPIC, "id")
+        val tasks = createKafkaReadStream[Task](spark, Config.TASKS_TOPIC, Schemas.tasksSchema, "id")
             .as("t")
 
-        val fragments = createKafkaReadStream[OpenDTFragment](spark, Config.FRAGMENTS_TOPIC, "id")
+        val fragments = createKafkaReadStream[OpenDTFragment](spark, Config.FRAGMENTS_TOPIC, Schemas.openDTFragmentSchema, "id")
             .as("f")
 
         var win = 1;
         var i = 0;
-
 
         tasks
             .join(fragments, tasks("id") === fragments("id"), "inner")
@@ -71,6 +82,8 @@ object DigitalTwin {
             .trigger(Trigger.ProcessingTime(Config.WINDOW_SIZE_MS_SIM))
             .foreachBatch { (batch: DataFrame, _: Long) =>
                 println(s"Processing batch $i")
+
+                val windows = ArrayBuffer[Window]()
                 batch
                     .select(col("window.start").as("start"), col("window.end").as("end"))
                     .orderBy(col("start"), col("end"))
@@ -87,43 +100,47 @@ object DigitalTwin {
                             .select(explode(col("rows")).as("row"))
                             .select(col("row.*"))
 
-                        val fmt = DateTimeFormatter.ofPattern("dd_MM_yyyy_HH_mm_ss").withZone(ZoneOffset.UTC)
-                        val winStartStr = fmt.format(wStart.toInstant)
-                        val winEndStr   = fmt.format(wEnd.toInstant)
-                        val base = s"data/${winStartStr}-${winEndStr}"
-
                         val currFragments = records
                             .select(col("f.*"))
                             .withColumn("submission_time", from_utc_timestamp(col("submission_time"), "UTC"))
                             .as[OpenDTFragment]
-
-                        currFragments
-                            .write
-                            .mode("overwrite")
-                            .parquet(s"${base}/fragments")
-
-                        //currFragments.groupBy("submission_time").count().orderBy("submission_time").show(100)
 
                         val tasks = records
                             .select(col("t.*"))
                             .dropDuplicates("id")
                             .withColumn(
                                 "duration",
-                                col("duration") - lit(Config.WINDOW_SIZE_MS * win)
+                                greatest(lit(0L), col("duration").cast("long") - lit(Config.WINDOW_SIZE_MS * win))
                             )
                             .withColumn("submission_time", from_utc_timestamp(col("submission_time"), "UTC"))
                             .as[Task]
-
-                        tasks.show(10)
-
-                        tasks
-                            .write
-                            .mode("overwrite")
-                            .parquet(s"${base}/tasks")
-
-                        println(s"record ${wStart}-${wEnd} written")
                         win += 1
+
+                        windows += Window(wStart, wEnd, tasks, currFragments)
                     }
+
+                if(windows.nonEmpty){
+                    val topologyRes = topologyRecommender.findBestTopologies(windows)(ec)
+                    println(s"Best topology in this batch is: ${topologyRes._1}, with the follwoing slo's: ${topologyRes._2}")
+                    println("Other candidates ranked from best to worst by Kwh")
+
+                    var rank = 1
+                    topologyRes._3
+                        .sortBy(topologyInf => topologyInf._2.kwh)
+                        .foreach(topologyInf => {
+
+                            println(s"Rank $rank")
+
+                            println("Topology: ")
+                            println(topologyInf._1)
+
+                            val sloInf = topologyInf._2
+                            println("SLO's: ")
+                            println(s"Kwh = ${sloInf.kwh}")
+                            println(s"Max power draw = ${sloInf.maxPowerDraw}")
+                            rank += 1
+                        })
+                }
                 println(s"Processing batch $i finished")
                 i += 1
             }

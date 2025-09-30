@@ -50,6 +50,13 @@ build/
 ### OpenDT traces ###
 surf-22/
 
+### OpenDT runtime experiment files ###
+experiment.json
+.experiment.json.crc
+kafka/opendt_sim_inputs/
+opendt_sim_inputs/
+output/
+
 ### Kafka data ###
 kafka/kafka-data/
 reader/
