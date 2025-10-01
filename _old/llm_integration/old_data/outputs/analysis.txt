@@ -1,0 +1,11 @@
+Analysis file create
+
+=========================================================
+Simulation made at 2025-09-16 15:45:52
+Metric: power_draw
+Unit: k
+Window size: 10
+Sample count in raw sim data: 17304
+Computing time 0.3s
+Plot path: data//outputs/simulation-analysis/power_draw/figure-9A.pdf
+=========================================================
