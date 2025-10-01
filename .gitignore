@@ -60,3 +60,5 @@ output/
 ### Kafka data ###
 kafka/kafka-data/
 reader/
+
+.venv
