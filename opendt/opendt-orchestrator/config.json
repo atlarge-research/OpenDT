@@ -1,0 +1,9 @@
+{
+  "kafka_bootstrap_servers": "localhost:9092",
+  "cycle_interval_seconds": 300,
+  "opendc_runner_path": "opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner",
+  "default_topology": "resources/topologies/small_datacenter.json",
+  "workload_traces": "resources/workload_traces/kafka_stream",
+  "llm_model": "gpt-3.5-turbo",
+  "simulation_timeout": 300
+}
