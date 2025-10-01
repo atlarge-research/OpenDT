@@ -2,19 +2,13 @@
 
 Real-time datacenter simulation with Kafka streaming and LLM-powered optimization.
 
-## Quick Start
+## Quick Start - Docker
 
-1. Start Kafka:
-`brew services start kafka`
-
-2. Setup topics:
-`./scripts/setup_kafka.sh`
-
-3. Run system:
-`python opendt-orchestrator/digital_twin_runner.py`
-
-4. Monitor:
-`python opendt-streaming/src/main/python/kafka_consumer.py`
+```bash
+cd opendt
+export OPENAI_API_KEY="your-key-here"
+docker-compose up
+```
 
 ## Components
 

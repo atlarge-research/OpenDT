@@ -57,26 +57,32 @@ class DigitalTwinRunner:
             print(f"❌ System startup failed: {e}")
             await self._cleanup()
 
-    def _system_health_check(self):
+    def system_health_check(self):
         """Comprehensive system health check"""
         print("🔍 System health check...")
 
-        # Check Kafka
+        # Check Kafka using Python client instead of command
         try:
-            result = subprocess.run(['kafka-topics', '--list', '--bootstrap-server',
-                                     self.config['kafka_bootstrap_servers']],
-                                    capture_output=True, text=True, timeout=5)
-            if result.returncode != 0:
-                raise Exception("Kafka not responding")
+            from kafka import KafkaAdminClient
+            from kafka.errors import NoBrokersAvailable
+
+            client = KafkaAdminClient(
+                bootstrap_servers=self.config['kafka_bootstrap_servers'],
+                request_timeout_ms=5000
+            )
+            client.close()
             print("✅ Kafka: Running")
+        except NoBrokersAvailable:
+            print(f"❌ Kafka: Cannot connect to {self.config['kafka_bootstrap_servers']}")
+            raise Exception("Kafka not responding")
         except Exception as e:
             print(f"❌ Kafka: {e}")
-            print("💡 Start Kafka with: brew services start kafka")
             raise
 
         # Check Python dependencies
         try:
-            import pandas, kafka
+            import pandas
+            import kafka
             print("✅ Dependencies: Available")
         except ImportError as e:
             print(f"❌ Missing dependency: {e}")
@@ -85,9 +91,10 @@ class DigitalTwinRunner:
         # Check OpenDC runner
         opendc_path = Path(self.config.get('opendc_runner_path', ''))
         if opendc_path.exists():
-            print("✅ OpenDC: Runner found")
+            print("✅ OpenDC Runner: Found")
         else:
-            print("⚠️ OpenDC: Runner not found, using mock simulation")
+            print("⚠️  OpenDC Runner: Not found, using mock simulation")
+
 
     def _initialize_kafka_system(self):
         """Initialize complete Kafka system"""

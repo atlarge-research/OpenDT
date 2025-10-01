@@ -1,0 +1,6 @@
+pandas>=2.0.0
+kafka-python>=2.0.0
+langchain-openai>=0.3.0
+pydantic>=2.0.0
+pyarrow>=20.0.0
+lz4>=3.1.0
