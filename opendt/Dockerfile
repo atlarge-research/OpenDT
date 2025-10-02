@@ -1,34 +1,41 @@
-# Multi-stage build for OpenDT Digital Twin System
-FROM python:3.10-slim AS base
+FROM python:3.10-slim
 
-# Install system dependencies including Java 21 (standard for Debian Trixie)
-RUN apt-get update && apt-get install -y \
-    openjdk-21-jre-headless \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install Java JDK 21 and essentials
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-21-jdk-headless \
+    ca-certificates wget unzip \
+ && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Derive JAVA_HOME from the installed 'java', and provide stable symlinks
+RUN set -eux; \
+    JH="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"; \
+    mkdir -p /usr/lib/jvm; \
+    ln -sfn "$JH" /usr/lib/jvm/default-java; \
+    # Ensure compatibility with scripts expecting this exact path
+    if [ ! -e /usr/lib/jvm/java-21-openjdk-amd64 ]; then \
+      ln -s "$JH" /usr/lib/jvm/java-21-openjdk-amd64; \
+    fi
+
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV PATH="$JAVA_HOME/bin:$PATH"
+
 WORKDIR /app
 
-# Copy Python requirements and install dependencies including lz4
-COPY requirements.txt* ./
-RUN pip install --no-cache-dir \
-    pandas \
-    kafka-python \
-    langchain-openai \
-    pydantic \
-    pyarrow \
-    lz4
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire project
+# App code
 COPY . .
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+# Best-effort: if baked in, set runner executable
+RUN if [ -f /app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner ]; then \
+      chmod +x /app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner; \
+    fi
 
-# Expose any ports if needed (optional)
-EXPOSE 9092
+# Entrypoint ensures runtime perms and JAVA_HOME PATH before launching
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Run the main digital twin system
-CMD ["python", "opendt-orchestrator/digital_twin_runner.py"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python", "src/main.py"]

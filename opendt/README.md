@@ -2,7 +2,9 @@
 
 Real-time datacenter simulation with Kafka streaming and LLM-powered optimization.
 
-## Quick Start - Docker
+## Quick Start - Brew + Docker
+
+Firstly start Kafka on the system: "
 
 ```bash
 cd opendt
