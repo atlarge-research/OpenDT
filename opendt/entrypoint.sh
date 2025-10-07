@@ -18,4 +18,7 @@ if [ -f "$RUNNER" ]; then
   chmod -R a+rx "/app/opendt-simulator/bin/OpenDCExperimentRunner" || true
 fi
 
+#give perms to run script
+chmod 777 ./run.sh
+
 exec "$@"

@@ -31,8 +31,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     ports:
       - "8080:8080"
+    working_dir: /app
     volumes:
-      - ./data:/app/data
-      - ./config:/app/config
-      # On SELinux hosts append :Z (or :z) to permit access/exec from bind mount
-      - ./opendt-simulator:/app/opendt-simulator
+      - ./:/app
+
