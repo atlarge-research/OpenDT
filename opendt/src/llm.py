@@ -7,7 +7,7 @@ import copy
 logger = logging.getLogger(__name__)
 
 
-class SimpleOptimizer:
+class LLM:
     """LLM-based topology optimizer with better error handling and topology updates"""
 
     def __init__(self, openai_key):
@@ -18,14 +18,14 @@ class SimpleOptimizer:
         logger.info(f"LLM Optimizer initialized. API Key present: {self.has_llm}")
 
     def calculate_performance_score(self, sim_results):
-        """Calculate a performance score (lower is better)
-        TODO: update this to use a better metric, alligned with SLOs. Aka, the one that deviates the least (or the most,
-        but in the good direction) from the SLOs.
-        """
+        """Calculate a performance score (lower is better)"""
+        # TODO: update score to use a better metric, alligned with SLOs.
+        #  Aka, the one that deviates the least (or the most, but in the good direction) from the SLOs.
+        # equally penalize the energy usage and performance.
+
         energy = sim_results.get('energy_kwh', 5.0)
-        runtime = sim_results.get('runtime_hours', 1.0)
-        # Weight energy more heavily than runtime
-        score = (energy * 2.0) + (runtime * 1.0)
+        performance = sim_results.get('runtime_hours', 1.0)
+        score = (energy * 2.0) + (performance * 1.0)
         return score
 
     def update_best_configuration(self, sim_results, topology_data):
@@ -57,6 +57,8 @@ class SimpleOptimizer:
     def rule_based_optimization(self, sim_results, batch_data, current_topology=None, reason=""):
         """Simple rule-based optimization with topology updates"""
         energy = sim_results.get('energy_kwh', 2.0)
+
+        # TODO: instead of CPU_utilization, find out the total time elapsed in running the tasks
         cpu_util = sim_results.get('cpu_utilization', 0.5)
         task_count = batch_data.get('task_count', 10)
 
@@ -70,6 +72,13 @@ class SimpleOptimizer:
             # Generate new topology based on rules
             new_topology = copy.deepcopy(current_topology)
 
+            # TODO: update these rules.
+            # TODO: have a rule that says if it's already 15% over the SLO, then it's critical. Show purple.
+            # TODO: if over SLO, it's bad, show red. Not cricial, but already danger zone.
+            # TODO: if it's within 15% of SLO, it's warning, show orange.
+            # TODO: else it's good, show green.
+
+            # TODO: do this for energy and performance at the same time. e.g., if at least one of them is bad, then it's bad.
             if energy > 10.0:
                 recommendations.append("🔥 CRITICAL: Reduce host count - very high energy consumption")
                 action = "massive downscale"
@@ -163,6 +172,7 @@ You need to recommend similar configuration which helps to achieve objectives:
 
 SIMULATION RESULTS:
 - Energy Usage: {sim_results.get('energy_kwh', 'N/A')} kWh
+- Runtime: {sim_results.get('runtime_hours', 'N/A')} hours
 - CPU Utilization: {sim_results.get('cpu_utilization', 'N/A')}
 - Task Count: {batch_data.get('task_count', 'N/A')}  
 - Fragment Count: {batch_data.get('fragment_count', 'N/A')}
@@ -247,20 +257,6 @@ Example:
             if isinstance(obj, dict):
                 return obj.get(name, default)
             return default
-
-        # Ensure we have a working base topology
-        if not current_topology:
-            current_topology = {
-                "clusters": [{
-                    "name": "C01",
-                    "hosts": [{
-                        "name": "H01",
-                        "count": 1,
-                        "cpu": {"coreCount": 16, "coreSpeed": 2400},
-                        "memory": {"memorySize": 34359738368}
-                    }]
-                }]
-            }
 
         new_topology = copy.deepcopy(current_topology)
 

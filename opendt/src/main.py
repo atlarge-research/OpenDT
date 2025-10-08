@@ -9,7 +9,7 @@ from flask import Flask, render_template, jsonify
 from kafka_producer import TimedKafkaProducer
 from kafka_consumer import DigitalTwinConsumer
 from opendc_runner import OpenDCRunner
-from llm_optimizer import SimpleOptimizer
+from llm import LLM
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class OpenDTOrchestrator:
         self.producer = None
         self.consumer = None
         self.opendc_runner = OpenDCRunner()
-        self.optimizer = SimpleOptimizer(self.openai_key)
+        self.optimizer = LLM(self.openai_key)
 
         # Threading control
         self.stop_event = threading.Event()
@@ -59,7 +59,7 @@ class OpenDTOrchestrator:
         self.consumer_thread = None
 
         # Topology file plumbing
-        self.topology_path = '/app/config/topology_template.json'
+        self.topology_path = '/app/config/topology.json'
         self.last_topology_hash = None
 
         # Load initial topology and start file watcher (keeps dashboard in sync)
