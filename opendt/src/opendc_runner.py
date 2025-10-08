@@ -279,38 +279,8 @@ class OpenDCRunner:
                 'cpu_utilization': float(round(cpu_util, 3)),
                 'max_power_draw': float(round(max_power, 1)),
                 'runtime_hours': float(round(runtime_hours, 2)),
-                'simulation_type': 'real_opendc',
-                'status': 'success'
+                'status': 'success',
             }
 
         except Exception as e:
             logger.error(f"Failed to parse OpenDC results: {e}")
-            return self.create_enhanced_mock_results([], [], f"Result parsing failed: {str(e)}")
-
-    def create_enhanced_mock_results(self, tasks_data, fragments_data, error_reason):
-        """Create realistic mock results with error info"""
-        import random
-
-        task_count = len(tasks_data) if tasks_data else 10
-        fragment_count = len(fragments_data) if fragments_data else 50
-
-        # More realistic energy calculations based on workload
-        base_energy = 0.8 + (task_count * 0.15) + (fragment_count * 0.005)
-        energy_kwh = round(base_energy + random.uniform(-0.3, 0.5), 3)
-
-        # CPU utilization based on fragments
-        if fragments_data:
-            avg_cpu = sum(f.get('cpu_usage', 0.5) for f in fragments_data) / len(fragments_data)
-            cpu_utilization = round(min(0.95, avg_cpu + random.uniform(-0.1, 0.1)), 3)
-        else:
-            cpu_utilization = round(random.uniform(0.4, 0.8), 3)
-
-        return {
-            'energy_kwh': energy_kwh,
-            'cpu_utilization': cpu_utilization,
-            'max_power_draw': round(600 + (task_count * 5) + random.uniform(0, 200), 1),
-            'runtime_hours': round(0.1 + (task_count * 0.005), 2),
-            'simulation_type': 'enhanced_mock',
-            'status': 'fallback',
-            'error_reason': error_reason
-        }
