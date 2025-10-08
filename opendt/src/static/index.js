@@ -1,86 +1,106 @@
 const $ = s => document.querySelector(s);
 const modeKey = 'opendt-view-mode';
 
+// ---- helpers -------------------------------------------------
+function fmt(n, d=1){ return (n===null||n===undefined||isNaN(n)) ? '—' : Number(n).toFixed(d); }
+function pct(n, d=1){ return (n===null||n===undefined||isNaN(n)) ? '—' : (Number(n)*100).toFixed(d) + '%'; }
 
+// Parse "Window 1: 121 tasks, 1155 fragments"
+function parseWindowCounts(info){
+  const m = /:\s*([\d,]+)\s*tasks?\s*,\s*([\d,]+)\s*fragments?/i.exec(info || "");
+  if (!m) return { tasks: null, frags: null };
+  const toInt = s => parseInt(String(s).replace(/,/g,''), 10);
+  return { tasks: toInt(m[1]), frags: toInt(m[2]) };
+}
+
+// ---- UI mode / button ripple --------------------------------
+document.addEventListener('click', e => {
+  const b = e.target.closest('.btn');
+  if (!b) return;
+  const r = b.getBoundingClientRect();
+  b.style.setProperty('--press-x', (e.clientX - r.left) + 'px');
+  b.style.setProperty('--press-y', (e.clientY - r.top) + 'px');
+});
 
 function setMode(mode){
   document.body.classList.toggle('mode-json', mode === 'json');
-  $('#btnModeUI').classList.toggle('active', mode === 'ui');
-  $('#btnModeJSON').classList.toggle('active', mode === 'json');
+  $('#btnModeUI')?.classList.toggle('active', mode === 'ui');
+  $('#btnModeJSON')?.classList.toggle('active', mode === 'json');
   localStorage.setItem(modeKey, mode);
 }
-
-function fmt(n, d=1){ return (n===null||n===undefined||isNaN(n)) ? '—' : Number(n).toFixed(d); }
-function pct(n, d=1){ return (n===null||n===undefined||isNaN(n)) ? '—' : (Number(n)*100).toFixed(d) + '%'; }
 
 function applyStatus(status){
   const up = (status||'').toLowerCase() === 'running';
   const btn = $('#toggleBtn');
-  btn.textContent = up ? '⏹ Stop' : '▶ Start';
-  btn.className = 'btn ' + (up ? 'btn-danger' : 'btn-primary');
-
+  if (btn){
+    btn.className = 'btn ' + (up ? 'btn-danger' : 'btn-primary');
+    btn.innerHTML = up
+      ? `<span class="icon" style="--icon-url:var(--sym-stop)"></span>&nbsp;Stop`
+      : `<span class="icon" style="--icon-url:var(--sym-play)"></span>&nbsp;Start`;
+  }
   const pill = $('#statusPill');
-  pill.classList.toggle('running', up);
-  pill.classList.toggle('stopped', !up);
-  $('#statusText').textContent = (status || '—').toUpperCase();
+  pill?.classList.toggle('running', up);
+  pill?.classList.toggle('stopped', !up);
+  $('#statusText') && ($('#statusText').textContent = (status || '—').toUpperCase());
 }
 
 async function toggleSystem(){
-  const status = ($('#statusText').textContent || '').toUpperCase();
+  const status = ($('#statusText')?.textContent || '').toUpperCase();
   const endpoint = (status === 'RUNNING' || status === 'STARTING') ? '/api/stop' : '/api/start';
-  try{
-    await fetch(endpoint, {method:'POST'});
-    // polling will refresh UI
-  }catch(e){}
+  try{ await fetch(endpoint, {method:'POST'}); }catch(e){}
 }
 
+// ---- Renders -------------------------------------------------
 function renderMetrics(s){
-  $('#mCycles').textContent  = s.cycle_count ?? 0;
-  $('#mTasks').textContent   = s.total_tasks ?? 0;
+  const { tasks, frags } = parseWindowCounts(s.current_window);
+  $('#mCycles')      && ($('#mCycles').textContent = s.cycle_count ?? 0);
+  $('#mTasks')       && ($('#mTasks').textContent  = (tasks ?? s.total_tasks ?? 0));
+  $('#mFragments')   && ($('#mFragments').textContent = (frags ?? s.total_fragments ?? 0));
 
   const sim = s.last_simulation || {};
-  $('#mEnergy').textContent  = fmt(sim.energy_kwh, 2);
-  $('#mCPU').textContent     = pct(sim.cpu_utilization ?? 0, 1);
-  $('#mRuntime').textContent = fmt(sim.runtime_hours, 1) + 'h';
-  $('#mTopoUpdates').textContent = s.topology_updates ?? 0;
+  $('#mEnergy')      && ($('#mEnergy').textContent  = fmt(sim.energy_kwh, 2));
+  $('#mCPU')         && ($('#mCPU').textContent     = pct(sim.cpu_utilization ?? 0, 1));
+  $('#mRuntime')     && ($('#mRuntime').textContent = fmt(sim.runtime_hours, 1) + 'h');
+  $('#mTopoUpdates') && ($('#mTopoUpdates').textContent = s.topology_updates ?? 0);
 
   const opt = s.last_optimization || {};
   const action = opt.action_taken || (Array.isArray(opt.action_type) ? opt.action_type[0] : null) || '—';
-  $('#mLLMAction').textContent = action;
+  $('#mLLMAction') && ($('#mLLMAction').textContent = action);
   const typ = (opt.type || '—').replace('_',' ');
-  $('#mLLMType').innerHTML = typ !== '—' ? `<span class="badge">${typ}</span>` : '—';
+  const llmTypeEl = $('#mLLMType');
+  if (llmTypeEl) llmTypeEl.innerHTML = typ !== '—' ? `<span class="badge">${typ}</span>` : '—';
 }
 
 function renderOpenDC(sim){
-  $('#kvEnergy').textContent   = fmt(sim.energy_kwh, 2);
-  $('#kvCPU').textContent      = pct(sim.cpu_utilization, 1);
-  $('#kvRuntime').textContent  = fmt(sim.runtime_hours, 1);
-  $('#kvMaxPower').textContent = fmt(sim.max_power_draw, 0);
-  $('#kvSimType').textContent  = sim.status || '—';
+  $('#kvEnergy')   && ($('#kvEnergy').textContent   = fmt(sim.energy_kwh, 2));
+  $('#kvCPU')      && ($('#kvCPU').textContent      = pct(sim.cpu_utilization, 1));
+  $('#kvRuntime')  && ($('#kvRuntime').textContent  = fmt(sim.runtime_hours, 1));
+  $('#kvMaxPower') && ($('#kvMaxPower').textContent = fmt(sim.max_power_draw, 0));
+  $('#kvSimType')  && ($('#kvSimType').textContent  = sim.status || '—');
 
   const pre = $('#simJSON');
   const txt = JSON.stringify(sim || null, null, 2);
-  if (pre.textContent !== txt) pre.textContent = txt;
+  if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
 function renderLLM(opt){
-  $('#kvLLMAction').textContent   = opt.action_taken || '—';
-  $('#kvLLMReason').textContent   = opt.reason || '—';
-  $('#kvLLMPriority').textContent = opt.priority || '—';
-  $('#kvLLMType').textContent     = (opt.type || '—').replace('_',' ');
+  $('#kvLLMAction')   && ($('#kvLLMAction').textContent = opt.action_taken || '—');
+  $('#kvLLMReason')   && ($('#kvLLMReason').textContent = opt.reason || '—');
+  $('#kvLLMPriority') && ($('#kvLLMPriority').textContent = opt.priority || '—');
+  $('#kvLLMType')     && ($('#kvLLMType').textContent     = (opt.type || '—').replace('_',' '));
 
-  // Recommendations list
   const list = $('#kvLLMRecs');
   const recs = opt.recommendations || opt.llm_recommendations || [];
-  list.innerHTML = recs.length ? recs.map(r=>`<li>${r}</li>`).join('') : '<li>—</li>';
+  if (list) list.innerHTML = recs.length ? recs.map(r=>`<li>${r}</li>`).join('') : '<li>—</li>';
 
   const pre = $('#llmJSON');
   const txt = JSON.stringify(opt || null, null, 2);
-  if (pre.textContent !== txt) pre.textContent = txt;
+  if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
 function renderTopoTable(topo){
   const body = $('#topoTable tbody');
+  if (!body) return;
   const rows = [];
   try{
     const clusters = (topo && topo.clusters) || [];
@@ -103,29 +123,40 @@ function renderTopoTable(topo){
 
   const pre = $('#topologyJSON');
   const txt = JSON.stringify(topo || null, null, 2);
-  if (pre.textContent !== txt) pre.textContent = txt;
+  if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
 function renderBest(best){
-  const scoreBadge = $('#bestScore');
-  if (best && best.score !== undefined && best.score !== null){
-    scoreBadge.textContent = `Score: ${Number(best.score).toFixed(2)}`;
-  } else {
-    scoreBadge.textContent = 'Score: —';
+  const badge = $('#bestScore');
+  if (badge){
+    if (best && best.score !== undefined && best.score !== null){
+      badge.textContent = `Score: ${Number(best.score).toFixed(2)}`;
+    } else {
+      badge.textContent = 'Score: —';
+    }
   }
   const pre = $('#bestJSON');
   const payload = best ? (best.config ? best : {config: best}) : null;
   const txt = JSON.stringify(payload, null, 2);
-  if (pre.textContent !== txt) pre.textContent = txt;
+  if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
+// ---- polling -------------------------------------------------
 async function poll(){
   try{
     const r = await fetch('/api/status', {cache:'no-store'});
     const s = await r.json();
 
     applyStatus(s.status);
-    $('#windowInfo').textContent = s.current_window || '';
+
+    // NEW: right-side window pill text
+    const wp = document.querySelector('#windowPill');
+    if (wp) {
+      const n = s.cycle_count ?? null;                 // window number
+      const info = s.current_window || '';             // "Window 1: …"
+      wp.textContent = n ? `Window ${n}` : (info || '—');
+    }
+
     renderMetrics(s);
     renderOpenDC(s.last_simulation || {});
     renderLLM(s.last_optimization || {});
@@ -134,11 +165,6 @@ async function poll(){
   }catch(e){}
 }
 
-// init view mode
 setMode(localStorage.getItem(modeKey) || 'ui');
-
-// first paint & live refresh
 poll();
 setInterval(poll, 2000);
-
-

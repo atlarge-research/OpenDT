@@ -72,7 +72,7 @@ class SimpleOptimizer:
 
             if energy > 10.0:
                 recommendations.append("🔥 CRITICAL: Reduce host count - very high energy consumption")
-                action = "scale_down"
+                action = "massive downscale"
                 # Reduce host count if possible
                 for cluster in new_topology.get('clusters', []):
                     for host in cluster.get('hosts', []):
@@ -80,7 +80,7 @@ class SimpleOptimizer:
                             host['count'] = max(1, host['count'] - 1)
             elif energy > 5.0:
                 recommendations.append("⚠️ HIGH: Consider reducing core speed - high energy usage")
-                action = "consolidate"
+                action = "downscale"
                 # Reduce core speed
                 for cluster in new_topology.get('clusters', []):
                     for host in cluster.get('hosts', []):
@@ -89,7 +89,7 @@ class SimpleOptimizer:
                             host['cpu']['coreSpeed'] = max(2000, int(current_speed * 0.9))
             elif cpu_util > 0.8:
                 recommendations.append("📈 SCALE UP: Add CPU cores - high utilization")
-                action = "scale_up"
+                action = "upscale"
                 # Increase core count
                 for cluster in new_topology.get('clusters', []):
                     for host in cluster.get('hosts', []):
@@ -98,7 +98,7 @@ class SimpleOptimizer:
                             host['cpu']['coreCount'] = min(32, current_cores + 4)
             elif cpu_util < 0.3:
                 recommendations.append("📉 CONSOLIDATE: Reduce cores - low utilization")
-                action = "consolidate"
+                action = "slightly downscale"
                 # Reduce core count
                 for cluster in new_topology.get('clusters', []):
                     for host in cluster.get('hosts', []):

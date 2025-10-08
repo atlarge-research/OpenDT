@@ -8,15 +8,21 @@
 </head>
 <body>
   <div class="container">
-    <header class="header">
-      <h1>🏢 OpenDT Digital Twin Dashboard</h1>
+    <!-- Title slate -->
+    <header class="header glass sheen lift energy-header">
+      <h1>
+        <span class="icon" style="--icon-url:var(--sym-gauge)"></span>
+        &nbsp;OpenDT Digital Twin Dashboard
+      </h1>
       <p class="sub">Real-time datacenter simulation in rolling windows · LLM-guided topology optimization</p>
     </header>
 
     <!-- Controls -->
-    <section class="controls">
+    <section class="controls glass lift">
       <div class="row">
-        <button id="toggleBtn" class="btn btn-primary" onclick="toggleSystem()">▶ Start</button>
+        <button id="toggleBtn" class="btn btn-primary" onclick="toggleSystem()" data-tip="Start / Stop">
+          <span class="icon" style="--icon-url:var(--sym-play)"></span>&nbsp;Start
+        </button>
 
         <div id="statusPill" class="status stopped">
           <span class="dot"></span>
@@ -30,53 +36,58 @@
             <button id="btnModeJSON" onclick="setMode('json')">JSON</button>
           </div>
         </div>
-      </div>
 
-      <div class="sub" id="windowInfo" style="margin-top:10px;">
-        <!-- filled live -->
+        <div id="windowPill" class="window-pill pill">Window —</div>
       </div>
     </section>
 
+
     <!-- Metrics -->
     <section class="metrics">
-      <div class="metric">
-        <h3>PROCESSING</h3>
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-chart)"></span>&nbsp;PROCESSING</h3>
         <div id="mCycles" class="value">0</div>
         <div class="meta">Optimization Cycles</div>
       </div>
 
-      <div class="metric">
-        <h3>WORKLOAD</h3>
-        <div id="mTasks" class="value">0</div>
-        <div class="meta">Total Tasks</div>
-      </div>
+    <div class="metric glass lift sheen">
+      <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
+      <div id="mTasks" class="value">0</div>
+      <div class="meta">Current Tasks</div>
+    </div>
 
-      <div class="metric">
-        <h3>ENERGY</h3>
+    <div class="metric glass lift sheen">
+      <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
+      <div id="mFragments" class="value">0</div>
+      <div class="meta">Current Fragments</div>
+    </div>
+
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-bolt)"></span>&nbsp;ENERGY</h3>
         <div id="mEnergy" class="value">—</div>
         <div class="meta">kWh Usage</div>
       </div>
 
-      <div class="metric">
-        <h3>CPU</h3>
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-cpu)"></span>&nbsp;CPU</h3>
         <div id="mCPU" class="value">—</div>
         <div class="meta">Utilization</div>
       </div>
 
-      <div class="metric">
-        <h3>RUNTIME</h3>
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-clock)"></span>&nbsp;RUNTIME</h3>
         <div id="mRuntime" class="value">—</div>
         <div class="meta">Simulation Time</div>
       </div>
 
-      <div class="metric">
-        <h3>TOPOLOGY</h3>
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;TOPOLOGY</h3>
         <div id="mTopoUpdates" class="value">0</div>
-        <div class="meta">Configuration Updates</div>
+        <div class="meta">Infrastructure Adjustment(s)</div>
       </div>
 
-      <div class="metric">
-        <h3>LLM</h3>
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-wand)"></span>&nbsp;LLM</h3>
         <div id="mLLMAction" class="value">—</div>
         <div class="meta" id="mLLMType">—</div>
       </div>
@@ -85,10 +96,8 @@
     <!-- Detail cards -->
     <section class="section-grid">
       <!-- OpenDC Results -->
-      <div class="card">
+      <div class="card glass lift">
         <h3>📈 Latest OpenDC Results</h3>
-
-        <!-- UI mode -->
         <div class="ui-only">
           <div class="kv">
             <div><span>Energy (kWh)</span><strong id="kvEnergy">—</strong></div>
@@ -98,16 +107,12 @@
             <div><span>Status</span><span id="kvSimType" class="badge">—</span></div>
           </div>
         </div>
-
-        <!-- JSON mode -->
         <pre class="json-only" id="simJSON">null</pre>
       </div>
 
       <!-- LLM Optimization -->
-      <div class="card">
+      <div class="card glass lift">
         <h3>🤖 LLM Optimization</h3>
-
-        <!-- UI mode -->
         <div class="ui-only">
           <div class="kv">
             <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
@@ -121,17 +126,13 @@
             <ul id="kvLLMRecs"><li>—</li></ul>
           </div>
         </div>
-
-        <!-- JSON mode -->
         <pre class="json-only" id="llmJSON">null</pre>
       </div>
     </section>
 
     <!-- Topology -->
-    <section class="card">
+    <section class="card glass lift">
       <h3>🗺️ Current Topology</h3>
-
-      <!-- UI mode -->
       <div class="ui-only">
         <table id="topoTable">
           <thead>
@@ -149,17 +150,13 @@
           </tbody>
         </table>
       </div>
-
-      <!-- JSON mode -->
       <pre class="json-only" id="topologyJSON">null</pre>
     </section>
 
-    <!-- Best Config (optional) -->
-    <section class="card">
+    <!-- Best Config -->
+    <section class="card glass lift">
       <h3>🏅 Best Configuration</h3>
-      <div class="ui-only">
-        <div id="bestScore" class="badge">Score: —</div>
-      </div>
+      <div class="ui-only"><div id="bestScore" class="badge">Score: —</div></div>
       <pre class="json-only" id="bestJSON">null</pre>
     </section>
   </div>
@@ -167,5 +164,3 @@
   <script src="{{ url_for('static', filename='index.js') }}"></script>
 </body>
 </html>
-
-
