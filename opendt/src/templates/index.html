@@ -1,308 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>OpenDT Digital Twin</title>
-    <style>
-        body {
-            font-family: Arial;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .header {
-            background: #2c3e50;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .metrics {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .metric {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .metric h3 {
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-        }
-
-        .metric .value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #27ae60;
-        }
-
-        .controls {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 5px;
-        }
-
-        .btn-primary {
-            background: #3498db;
-            color: white;
-        }
-
-        .btn-danger {
-            background: #e74c3c;
-            color: white;
-        }
-
-        .status-running {
-            color: #27ae60;
-            font-weight: bold;
-        }
-
-        .status-stopped {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-
-        .status-stopping {
-            color: #f39c12;
-            font-weight: bold;
-        }
-
-        .data {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            font-family: monospace;
-            margin-bottom: 20px;
-        }
-
-        .window-info {
-            background: #ecf0f1;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            background: #ecf0f1;
-            color: #2c3e50;
-        }
-
-        ul {
-            margin: 8px 0 0 16px;
-        }
-    </style>
-    <script>
-        function startSystem() {
-            fetch('/api/start', {method: 'POST'})
-                .then(r => r.json())
-                .then(data => {
-                    alert(data.message);
-                    setTimeout(() => location.reload(), 2000);
-                });
-        }
-
-        function stopSystem() {
-            fetch('/api/stop', {method: 'POST'})
-                .then(r => r.json())
-                .then(data => {
-                    alert(data.message);
-                    setTimeout(() => location.reload(), 1000);
-                });
-        }
-
-        setInterval(() => location.reload(), 10000); // Auto-refresh every 10s
-    </script>
-    <script>
-        /* Lightweight live updates for topology + counter (keeps same look) */
-        async function refreshTopology() {
-            try {
-                const r = await fetch('/api/topology', {cache: 'no-store'});
-                const data = await r.json();
-
-                // Update the topology JSON pretty print
-                const pre = document.getElementById('current_topology_pre');
-                if (pre && data.current_topology) {
-                    // only update if changed to avoid flicker
-                    const nextText = JSON.stringify(data.current_topology, null, 2);
-                    if (pre.textContent !== nextText) pre.textContent = nextText;
-                }
-
-                // Update the "Configuration Updates" metric
-                const upd = document.getElementById('topology_updates_value');
-                if (upd && typeof data.topology_updates !== 'undefined') {
-                    if (upd.textContent !== String(data.topology_updates)) {
-                        upd.textContent = data.topology_updates;
-                    }
-                }
-            } catch (e) {
-                // silent fail is fine for a UI poller
-            }
-        }
-
-        // Poll every 2s for snappy reflection; keep your existing 10s page reload if you like
-        setInterval(refreshTopology, 2000);
-        refreshTopology();
-    </script>
-
+  <meta charset="UTF-8" />
+  <title>OpenDT Digital Twin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>🏢 OpenDT Digital Twin Dashboard</h1>
-        <p>Real-time datacenter simulation with 5-minute time windows</p>
-    </div>
+  <div class="container">
+    <header class="header">
+      <h1>🏢 OpenDT Digital Twin Dashboard</h1>
+      <p class="sub">Real-time datacenter simulation in rolling windows · LLM-guided topology optimization</p>
+    </header>
 
-    <div class="controls">
-        <h3>System Controls</h3>
-        <button class="btn btn-primary" onclick="startSystem()">▶️ Start System</button>
-        <button class="btn btn-danger" onclick="stopSystem()">⏹️ Stop System</button>
-        <span class="status-{{ state.status }}">
-                ● Status: {{ state.status.title() }}
-            </span>
+    <!-- Controls -->
+    <section class="controls">
+      <div class="row">
+        <button id="toggleBtn" class="btn btn-primary" onclick="toggleSystem()">▶ Start</button>
 
-        {% if state.current_window %}
-        <div class="window-info">
-            <strong>Current Window:</strong> {{ state.current_window }}
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="metrics">
-        <div class="metric">
-            <h3>🔄 Processing</h3>
-            <div class="value">{{ state.cycle_count }}</div>
-            <small>Optimization Cycles</small>
+        <div id="statusPill" class="status stopped">
+          <span class="dot"></span>
+          <strong>Status:</strong>
+          <span id="statusText">STOPPED</span>
         </div>
 
-        <div class="metric">
-            <h3>📊 Workload</h3>
-            <div class="value">{{ state.total_tasks or 0 }}</div>
-            <small>Total Tasks</small>
+        <div class="mode-switch">
+          <div class="seg">
+            <button id="btnModeUI" class="active" onclick="setMode('ui')">UI</button>
+            <button id="btnModeJSON" onclick="setMode('json')">JSON</button>
+          </div>
         </div>
+      </div>
 
-        {% if state.last_simulation %}
-        <div class="metric">
-            <h3>⚡ Energy</h3>
-            <div class="value">{{ "%.2f"|format(state.last_simulation.energy_kwh) }}</div>
-            <small>kWh Usage</small>
-        </div>
+      <div class="sub" id="windowInfo" style="margin-top:10px;">
+        <!-- filled live -->
+      </div>
+    </section>
 
-        <div class="metric">
-            <h3>💻 CPU</h3>
-            <div class="value">{{ "%.1f"|format((state.last_simulation.cpu_utilization or 0) * 100) }}%</div>
-            <small>Utilization</small>
-        </div>
+    <!-- Metrics -->
+    <section class="metrics">
+      <div class="metric">
+        <h3>PROCESSING</h3>
+        <div id="mCycles" class="value">0</div>
+        <div class="meta">Optimization Cycles</div>
+      </div>
 
-        <div class="metric">
-            <h3>⏱️ Runtime</h3>
-            <div class="value">{{ "%.1f"|format(state.last_simulation.runtime_hours or 0) }}h</div>
-            <small>Simulation Time</small>
-        </div>
-        {% endif %}
+      <div class="metric">
+        <h3>WORKLOAD</h3>
+        <div id="mTasks" class="value">0</div>
+        <div class="meta">Total Tasks</div>
+      </div>
 
-        {% if state.topology_updates is defined %}
-        <div class="metric">
-            <h3>🧩 Topology</h3>
-            <div class="value"><span id="topology_updates_value">{{ state.topology_updates or 0 }}</span></div>
-            <small>Configuration Updates</small>
-        </div>
-        {% endif %}
+      <div class="metric">
+        <h3>ENERGY</h3>
+        <div id="mEnergy" class="value">—</div>
+        <div class="meta">kWh Usage</div>
+      </div>
 
-        {% if state.best_config and state.best_config.score is not none %}
-        <div class="metric">
-            <h3>🏆 Best Score</h3>
-            <div class="value">{{ "%.2f"|format(state.best_config.score) }}</div>
-            <small>Lower is better</small>
-        </div>
-        {% endif %}
+      <div class="metric">
+        <h3>CPU</h3>
+        <div id="mCPU" class="value">—</div>
+        <div class="meta">Utilization</div>
+      </div>
 
-        {% if state.last_optimization %}
-        <div class="metric">
-            <h3>🤖 LLM</h3>
-            <div class="value">{{ (state.last_optimization.action_taken or '—') if state.last_optimization.action_taken
-                is defined else '—' }}
-            </div>
-            <small>
-                {% if state.last_optimization.type %}{{ state.last_optimization.type.replace('_',' ') }}{% else
-                %}optimization{% endif %}
-                {% if state.last_optimization.priority %} · <span
-                    class="badge">{{ state.last_optimization.priority }}</span>{% endif %}
-            </small>
-        </div>
-        {% endif %}
-    </div>
+      <div class="metric">
+        <h3>RUNTIME</h3>
+        <div id="mRuntime" class="value">—</div>
+        <div class="meta">Simulation Time</div>
+      </div>
 
-    {% if state.last_simulation %}
-    <div class="data">
+      <div class="metric">
+        <h3>TOPOLOGY</h3>
+        <div id="mTopoUpdates" class="value">0</div>
+        <div class="meta">Configuration Updates</div>
+      </div>
+
+      <div class="metric">
+        <h3>LLM</h3>
+        <div id="mLLMAction" class="value">—</div>
+        <div class="meta" id="mLLMType">—</div>
+      </div>
+    </section>
+
+    <!-- Detail cards -->
+    <section class="section-grid">
+      <!-- OpenDC Results -->
+      <div class="card">
         <h3>📈 Latest OpenDC Results</h3>
-        <pre>{{ state.last_simulation | tojson(indent=2) }}</pre>
-    </div>
-    {% endif %}
 
-    {% if state.last_optimization %}
-    <div class="data">
+        <!-- UI mode -->
+        <div class="ui-only">
+          <div class="kv">
+            <div><span>Energy (kWh)</span><strong id="kvEnergy">—</strong></div>
+            <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
+            <div><span>Runtime (h)</span><strong id="kvRuntime">—</strong></div>
+            <div><span>Max Power (W)</span><strong id="kvMaxPower">—</strong></div>
+            <div><span>Status</span><span id="kvSimType" class="badge">—</span></div>
+          </div>
+        </div>
+
+        <!-- JSON mode -->
+        <pre class="json-only" id="simJSON">null</pre>
+      </div>
+
+      <!-- LLM Optimization -->
+      <div class="card">
         <h3>🤖 LLM Optimization</h3>
-        {% set recs = state.last_optimization.recommendations or state.last_optimization.llm_recommendations %}
-        {% if recs %}
-        <strong>Recommendations:</strong>
-        <ul>
-            {% for r in recs %}
-            <li>{{ r }}</li>
-            {% endfor %}
-        </ul>
-        <br/>
-        {% endif %}
-        <pre>{{ state.last_optimization | tojson(indent=2) }}</pre>
-    </div>
-    {% endif %}
 
-    {% if state.current_topology %}
-    <div class="data">
-        <h3>🗺️ Current Topology</h3>
-        <pre id="current_topology_pre">{{ state.current_topology | tojson(indent=2) }}</pre>
-    </div>
-    {% else %}
-    <div class="data">
-        <h3>🗺️ Current Topology</h3>
-        <pre id="current_topology_pre">No topology yet</pre>
-    </div>
-    {% endif %}
+        <!-- UI mode -->
+        <div class="ui-only">
+          <div class="kv">
+            <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
+            <div><span>Reason</span><span id="kvLLMReason">—</span></div>
+            <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
+            <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
+          </div>
 
+          <div class="panel">
+            <div class="panel-title">Recommendations</div>
+            <ul id="kvLLMRecs"><li>—</li></ul>
+          </div>
+        </div>
 
-    {% if state.best_config %}
-    <div class="data">
-        <h3>🏅 Best Configuration</h3>
-        {% if state.best_config.score is not none %}
-        <div class="window-info"><strong>Score:</strong> {{ "%.2f"|format(state.best_config.score) }}</div>
-        {% endif %}
-        <pre>{{ state.best_config.config | tojson(indent=2) if state.best_config.config is defined else state.best_config | tojson(indent=2) }}</pre>
-    </div>
-    {% endif %}
-</div>
+        <!-- JSON mode -->
+        <pre class="json-only" id="llmJSON">null</pre>
+      </div>
+    </section>
+
+    <!-- Topology -->
+    <section class="card">
+      <h3>🗺️ Current Topology</h3>
+
+      <!-- UI mode -->
+      <div class="ui-only">
+        <table id="topoTable">
+          <thead>
+            <tr>
+              <th>Cluster</th>
+              <th>Host</th>
+              <th>Count</th>
+              <th>Cores</th>
+              <th>Clock (MHz)</th>
+              <th>Memory (GiB)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6">No topology</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- JSON mode -->
+      <pre class="json-only" id="topologyJSON">null</pre>
+    </section>
+
+    <!-- Best Config (optional) -->
+    <section class="card">
+      <h3>🏅 Best Configuration</h3>
+      <div class="ui-only">
+        <div id="bestScore" class="badge">Score: —</div>
+      </div>
+      <pre class="json-only" id="bestJSON">null</pre>
+    </section>
+  </div>
+
+  <script src="{{ url_for('static', filename='index.js') }}"></script>
 </body>
 </html>
+
+

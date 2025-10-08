@@ -206,124 +206,78 @@ class OpenDTOrchestrator:
         return (2.0 * float(energy)) + (1.0 * float(runtime))
 
     def run_consumer(self):
-        """For each window:
-           1) baseline sim on current topology
-           2) iterative proposal->probe loop within a strict time budget
-           3) apply the best found only if it's better than baseline by epsilon
-        """
+        """Per window: run baseline → time-bounded proposal loop → commit only if better."""
         try:
             logger.info("📥 Starting digital twin consumer...")
-
-            for cycle, batch_data in enumerate(self.consumer.process_windows()):
+            for cycle, batch_data in enumerate(self.consumer.process_windows(), start=1):
                 if self.stop_event.is_set():
                     break
 
-                cycle += 1
+                # window meta
                 self.state['cycle_count'] = cycle
                 self.state['current_window'] = batch_data.get('window_info', 'Processing...')
-
                 logger.info(f"🔄 Processing cycle {cycle}")
 
-                # ---- 1) BASELINE on current topology
-                baseline_results = self.run_simulation(batch_data)
-                self.state['last_simulation'] = baseline_results
-                baseline_score = self._score(baseline_results)
+                # 1) baseline on current topology
+                baseline = self.run_simulation(batch_data)
+                self.state['last_simulation'] = baseline
+                baseline_score = self._score(baseline)
 
-                # init per-window stats
-                self.state['window_baseline_score'] = round(baseline_score, 3)
-                self.state['window_best_score'] = round(baseline_score, 3)
-                self.state['window_trials'] = 0
-                self.state['window_accepted'] = False
-                self.state['window_time_used_sec'] = 0.0
+                # track a few lightweight stats for the dashboard
+                self.state.update({
+                    'window_baseline_score': round(baseline_score, 3),
+                    'window_best_score': round(baseline_score, 3),
+                    'window_trials': 0,
+                    'window_accepted': False,
+                })
 
-                best_topology = self.state['current_topology']
+                best_topology = self.state.get('current_topology')
                 best_score = baseline_score
-
-                # ---- 2) IMPROVEMENT LOOP (strict time budget)
-                deadline = time.monotonic() + WINDOW_TRY_BUDGET_SEC
+                seen = {self._topo_hash(best_topology) if best_topology else ''}
                 tries = 0
-                no_improve_streak = 0
-                seen_hashes = {self._topo_hash(best_topology) if best_topology else ''}
+                deadline = time.monotonic() + WINDOW_TRY_BUDGET_SEC
 
-                while time.monotonic() < deadline and tries < MAX_TRIES_PER_WINDOW and not self.stop_event.is_set():
+                # 2) improvement loop (strict time budget)
+                while (
+                        time.monotonic() < deadline
+                        and tries < MAX_TRIES_PER_WINDOW
+                        and not self.stop_event.is_set()
+                ):
                     tries += 1
+                    opt = self.optimizer.optimize(baseline, batch_data, current_topology=best_topology)
+                    self.state['last_optimization'] = opt
 
-                    # single proposal from optimizer (LLM if key present, else rule-based)
-                    opt_results = self.optimizer.optimize(
-                        baseline_results,  # give current performance context
-                        batch_data,
-                        current_topology=best_topology  # IMPORTANT: always attempt to improve the current-best
-                    )
-                    self.state['last_optimization'] = opt_results
-
-                    proposed = opt_results.get('new_topology')
+                    proposed = opt.get('new_topology')
                     if not proposed:
-                        logger.info("🧪 Proposal had no topology; skipping this try")
-                        no_improve_streak += 1
-                        if no_improve_streak >= NO_IMPROVEMENT_STOP_AFTER:
-                            logger.info("⏹️ Early stop: consecutive non-improvements")
-                            break
                         continue
-
-                    ph = self._topo_hash(proposed)
-                    if ph in seen_hashes:
-                        logger.info("🔁 Duplicate proposal; skipping probe run")
-                        no_improve_streak += 1
-                        if no_improve_streak >= NO_IMPROVEMENT_STOP_AFTER:
-                            logger.info("⏹️ Early stop: consecutive non-improvements (dupes)")
-                            break
+                    h = self._topo_hash(proposed)
+                    if h in seen:
                         continue
-                    seen_hashes.add(ph)
+                    seen.add(h)
 
-                    # probe with OpenDC
-                    probe_results = self.opendc_runner.run_simulation(
+                    probe = self.opendc_runner.run_simulation(
                         tasks_data=batch_data.get('tasks_sample', []),
                         fragments_data=batch_data.get('fragments_sample', []),
                         topology_data=proposed
                     )
-                    proposed_score = self._score(probe_results)
-
-                    # accept into *window-best* only if better
-                    if proposed_score < (best_score - IMPROVEMENT_DELTA):
-                        best_topology = proposed
-                        best_score = proposed_score
-                        no_improve_streak = 0
-                        logger.info(
-                            f"🏆 Window-best improved: {proposed_score:.3f} < {self.state['window_best_score']:.3f}")
+                    score = self._score(probe)
+                    if score < best_score - IMPROVEMENT_DELTA:
+                        best_topology, best_score = proposed, score
                         self.state['window_best_score'] = round(best_score, 3)
-                    else:
-                        logger.info(
-                            f"🙅 Not better this try: proposed {proposed_score:.3f} vs best {best_score:.3f}"
-                        )
-                        no_improve_streak += 1
 
-                    # update live stats
                     self.state['window_trials'] = tries
-                    self.state['window_time_used_sec'] = round(
-                        WINDOW_TRY_BUDGET_SEC - max(0.0, deadline - time.monotonic()), 2)
 
-                # ---- 3) APPLY best (if better than baseline)
-                if best_score < (baseline_score - IMPROVEMENT_DELTA) and best_topology is not None:
-                    applied = self.update_topology_file(best_topology)
-                    self.state['window_accepted'] = bool(applied)
-                    if applied:
-                        self.state['best_config'] = {
-                            'config': best_topology,
-                            'score': round(best_score, 3)
-                        }
-                        logger.info(
-                            f"✅ Applied window-best: {best_score:.3f} < baseline {baseline_score:.3f} "
-                            f"(trials={tries}, time_used≈{self.state['window_time_used_sec']}s)"
-                        )
+                # 3) apply only if better than baseline
+                if best_score < baseline_score - IMPROVEMENT_DELTA and best_topology:
+                    if self.update_topology_file(best_topology):
+                        self.state['window_accepted'] = True
+                        self.state['best_config'] = {'config': best_topology, 'score': round(best_score, 3)}
+                        logger.info(f"✅ Applied improved topology: {best_score:.3f} < {baseline_score:.3f}")
                 else:
-                    logger.info(
-                        f"📎 No commit this window (best {best_score:.3f} vs baseline {baseline_score:.3f})"
-                    )
+                    logger.info(f"📎 No commit (best {best_score:.3f} vs baseline {baseline_score:.3f})")
 
-                # soft pacing between windows (do not block kafka timing)
-                if not self.stop_event.wait(0.1):
-                    continue
-                else:
+                # don’t block the next window tick
+                if self.stop_event.wait(0.1):
                     break
 
         except Exception as e:
@@ -400,5 +354,5 @@ def api_reset_topology():
 
 
 if __name__ == '__main__':
-    # NOTE: ensure your index.html is under ./templates/index.html
+    # NOTE: ensure index.html is under ./templates/index.html
     app.run(host='0.0.0.0', port=8080, debug=False, threaded=True)

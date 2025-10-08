@@ -193,6 +193,17 @@ Example:
                 llm_result = parser.parse(response_text)
                 logger.info(f"🤖 Parsed LLM recommendation: {llm_result}")
 
+                # after: llm_result = parser.parse(response_text)
+                try:
+                    # If parse returned a dict, lift it into the model (no-op if already a model)
+                    if isinstance(llm_result, dict):
+                        from pydantic import BaseModel
+                        class _T(BaseModel): pass  # just to type-check safely
+
+                        llm_result = TopologyRecommendation(**llm_result)
+                except Exception:
+                    pass  # keep using dict; convert_llm_to_topology handles both
+
                 # Convert LLM output to topology format
                 new_topology = self.convert_llm_to_topology(llm_result, current_topology)
 
@@ -226,57 +237,71 @@ Example:
                                                 reason=f"LLM API Error: {str(e)}")
 
     def convert_llm_to_topology(self, llm_result, current_topology):
-        """Convert LLM output format to OpenDC topology format"""
-        # TODO: if not current_topology:
-        # handle this error by recalling the LLM with the same prompt and hoping for a reponse. if still no response,
-        # we can just skip
+        """Convert LLM output (pydantic OR dict) to OpenDC topology format."""
+        import copy
+
+        # Helper to read field from pydantic object or dict
+        def field(obj, name, default=None):
+            if hasattr(obj, name):  # pydantic / SimpleNamespace
+                return getattr(obj, name, default)
+            if isinstance(obj, dict):
+                return obj.get(name, default)
+            return default
+
+        # Ensure we have a working base topology
+        if not current_topology:
+            current_topology = {
+                "clusters": [{
+                    "name": "C01",
+                    "hosts": [{
+                        "name": "H01",
+                        "count": 1,
+                        "cpu": {"coreCount": 16, "coreSpeed": 2400},
+                        "memory": {"memorySize": 34359738368}
+                    }]
+                }]
+            }
+
         new_topology = copy.deepcopy(current_topology)
 
         try:
-            # Map LLM recommendations to topology
-            for i, cluster_name in enumerate(llm_result.cluster_name):
-                if i < len(llm_result.host_name):
-                    host_name = llm_result.host_name[i]
-                    core_count = llm_result.coreCount[i] if i < len(llm_result.coreCount) else 16
-                    core_speed = llm_result.coreSpeed[i] if i < len(llm_result.coreSpeed) else 2400
-                    count = llm_result.count[i] if i < len(llm_result.count) else 1
+            clusters = field(llm_result, "cluster_name", []) or []
+            hosts = field(llm_result, "host_name", []) or []
+            counts = field(llm_result, "count", []) or []
+            cores = field(llm_result, "coreCount", []) or []
+            clocks = field(llm_result, "coreSpeed", []) or []
 
-                    # Find or create cluster
-                    cluster = None
-                    for c in new_topology['clusters']:
-                        if c['name'] == cluster_name:
-                            cluster = c
-                            break
+            n = min(len(clusters), len(hosts))
+            for i in range(n):
+                cluster_name = clusters[i]
+                host_name = hosts[i]
+                count = counts[i] if i < len(counts) else 1
+                core_count = cores[i] if i < len(cores) else 16
+                core_speed = clocks[i] if i < len(clocks) else 2400
 
-                    if not cluster:
-                        cluster = {"name": cluster_name, "hosts": []}
-                        new_topology['clusters'].append(cluster)
+                # find or create cluster
+                cluster = next((c for c in new_topology["clusters"] if c["name"] == cluster_name), None)
+                if not cluster:
+                    cluster = {"name": cluster_name, "hosts": []}
+                    new_topology["clusters"].append(cluster)
 
-                    # Find or create host
-                    host = None
-                    for h in cluster['hosts']:
-                        if h['name'] == host_name:
-                            host = h
-                            break
-
-                    if not host:
-                        host = {
-                            "name": host_name,
-                            "count": count,
-                            "cpu": {"coreCount": core_count, "coreSpeed": core_speed},
-                            "memory": {"memorySize": 34359738368}
-                        }
-                        cluster['hosts'].append(host)
-                    else:
-                        # Update existing host
-                        host['cpu']['coreCount'] = core_count
-                        host['cpu']['coreSpeed'] = core_speed
-                        host['count'] = count
+                # find or create host
+                host = next((h for h in cluster["hosts"] if h["name"] == host_name), None)
+                if not host:
+                    host = {
+                        "name": host_name,
+                        "count": int(count),
+                        "cpu": {"coreCount": int(core_count), "coreSpeed": int(core_speed)},
+                        "memory": {"memorySize": 34359738368}
+                    }
+                    cluster["hosts"].append(host)
+                else:
+                    host["count"] = int(count)
+                    host["cpu"]["coreCount"] = int(core_count)
+                    host["cpu"]["coreSpeed"] = int(core_speed)
 
             logger.info("✅ Successfully converted LLM output to topology format")
-
         except Exception as e:
             logger.error(f"Error converting LLM output to topology: {e}")
-            # Return current topology if conversion fails
 
         return new_topology
