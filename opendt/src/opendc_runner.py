@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 import pandas as pd
 import os
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +97,7 @@ class OpenDCRunner:
             tasks_df = pd.DataFrame([
                 {
                     'id': t.get('id', 0),
-                    'submission_time': pd.to_datetime(t.get('submission_time', '2024-01-01')),
+                    'submission_time': int(pd.to_datetime(t.get('submission_time', '2024-01-01')).value) // 1_000_000,
                     'duration': t.get('duration', 30000),
                     'cpu_count': t.get('cpu_count', 1),
                     'cpu_capacity': t.get('cpu_capacity', 2400.0),
@@ -103,7 +105,17 @@ class OpenDCRunner:
                 }
                 for t in tasks_data
             ])
-            tasks_df.to_parquet(workload_dir / "tasks.parquet", index=False)
+            
+            tasks_table = pa.Table.from_pandas(tasks_df,  pa.schema([
+                pa.field("id", pa.int32(), nullable=False),   
+                pa.field("submission_time", pa.int64(), False),       
+                pa.field("duration", pa.int64(), False),             
+                pa.field("cpu_count", pa.int32(), False),             
+                pa.field("cpu_capacity", pa.float64(), False),        
+                pa.field("mem_capacity", pa.int64(), False),          
+            ]), preserve_index=False)
+
+            pq.write_table(tasks_table, workload_dir / "tasks.parquet")
             logger.info(f"📄 Created tasks.parquet with {len(tasks_df)} tasks")
 
         if fragments_data and len(fragments_data) > 0:
@@ -116,7 +128,15 @@ class OpenDCRunner:
                 }
                 for f in fragments_data
             ])
-            fragments_df.to_parquet(workload_dir / "fragments.parquet", index=False)
+
+            frags_table = pa.Table.from_pandas(fragments_df, pa.schema([
+                pa.field("id", pa.int32(), False),                  
+                pa.field("duration", pa.int64(), False),             
+                pa.field("cpu_count", pa.int32(), False),             
+                pa.field("cpu_usage", pa.float64(), False),             
+            ]), preserve_index=False)
+
+            pq.write_table(frags_table, workload_dir / "fragments.parquet")
             logger.info(f"📄 Created fragments.parquet with {len(fragments_df)} fragments")
 
         return str(workload_dir)
@@ -173,9 +193,9 @@ class OpenDCRunner:
 
             logger.info(f"OpenDC return code: {result.returncode}")
             if result.stdout:
-                logger.info(f"OpenDC stdout: {result.stdout[:500]}")
+                logger.info(f"OpenDC stdout: {result.stdout}")
             if result.stderr:
-                logger.info(f"OpenDC stderr: {result.stderr[:500]}")
+                logger.info(f"OpenDC stderr: {result.stderr}")
 
             if result.returncode != 0:
                 return self.create_enhanced_mock_results(tasks_data, fragments_data,
@@ -209,6 +229,8 @@ class OpenDCRunner:
             host_df = None
             service_df = None
 
+            #TODO change this to find the first directory that has all the files we need!
+            #or to chose one file!
             for output_dir in output_dirs:
                 if output_dir.exists():
                     logger.info(f"🔍 Found output directory: {output_dir}")
@@ -253,10 +275,10 @@ class OpenDCRunner:
                 logger.warning("⚠️ No service data found, using fallback runtime")
 
             return {
-                'energy_kwh': round(energy_kwh, 3),
-                'cpu_utilization': round(cpu_util, 3),
-                'max_power_draw': round(max_power, 1),
-                'runtime_hours': round(runtime_hours, 2),
+                'energy_kwh': float(round(energy_kwh, 3)),
+                'cpu_utilization': float(round(cpu_util, 3)),
+                'max_power_draw': float(round(max_power, 1)),
+                'runtime_hours': float(round(runtime_hours, 2)),
                 'simulation_type': 'real_opendc',
                 'status': 'success'
             }

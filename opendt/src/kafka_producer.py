@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 import threading
+from time import sleep
+from consts import TIME_SCALE
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,8 @@ class TimedKafkaProducer:
         self.bootstrap_servers = bootstrap_servers
         self.producer = None
         self.stop_streaming = threading.Event()
+        self.start_time: datetime = None
+        self.start_streaming_barrier = threading.Barrier(parties=2)
 
     def connect(self):
         """Connect to Kafka"""
@@ -27,6 +31,80 @@ class TimedKafkaProducer:
             value_serializer=lambda v: json.dumps(v).encode()
         )
         logger.info(f"📡 Connected to Kafka: {self.bootstrap_servers}")
+
+    def tasks_streaming_thread(self, tasks: pd.DataFrame, start_time):
+        #TODO  wait for both threads to start
+        #have a barrier here
+        
+        self.start_streaming_barrier.wait()
+        logger.info("Started streaming tasks")
+
+        last_submission_time = start_time
+        i = 0
+        for _, row in tasks.iterrows():
+            if self.stop_streaming.is_set():
+                return
+            
+            key = {'id': int(row['id'])}
+            value = {
+                'submission_time': row['submission_time'].isoformat(),
+                'duration': int(row['duration']),
+                'cpu_count': int(row['cpu_count']),
+                'cpu_capacity': float(row['cpu_capacity']),
+                'mem_capacity': int(row['mem_capacity'])
+            }
+            
+            submission_time = row["submission_time"]
+            if submission_time > last_submission_time:
+                sleep_time = (submission_time - last_submission_time).total_seconds()
+                sleep_time_virt = sleep_time * TIME_SCALE
+                
+                sleep(sleep_time_virt)
+
+            self.producer.send("tasks", key=key, value=value)
+
+            if(i % 20 == 0):
+                self.producer.flush()
+
+            last_submission_time = submission_time
+            i+=1
+
+    def fragments_streaming_thread(self, frags: pd.DataFrame, start_time):
+        #TODO  wait for both threads to start
+        #have a barrier here
+
+        self.start_streaming_barrier.wait()
+        logger.info("Started streaming fragments")
+
+        i = 0
+        last_submission_time = start_time
+
+        for _, row in frags.iterrows():
+            if self.stop_streaming.is_set():
+                return
+            
+            key = {'id': int(row['id'])}
+            value = {
+                'duration': int(row['duration']),
+                'cpu_usage': float(row['cpu_usage']),
+                'submission_time': row['submission_time'].isoformat()
+            }
+            
+            submission_time = row["submission_time"]
+            if submission_time > last_submission_time:
+                sleep_time = (submission_time - last_submission_time).total_seconds()
+                sleep_time_virt = sleep_time * TIME_SCALE
+
+                sleep(sleep_time_virt)
+
+
+            self.producer.send("fragments", key=key, value=value)
+
+            if(i % 100 == 0):
+                self.producer.flush()
+
+            last_submission_time = submission_time
+            i+= 1
 
     def stream_parquet_data_timed(self, tasks_file, fragments_file):
         """Stream data in 5-minute windows with PROPER time spacing"""
@@ -41,12 +119,18 @@ class TimedKafkaProducer:
         # Convert submission_time to datetime
         tasks_df['submission_time'] = pd.to_datetime(tasks_df['submission_time'])
 
-        # Merge fragments with task submission times
-        fragments_df = fragments_df.merge(
-            tasks_df[['id', 'submission_time']],
-            on='id',
-            how='left'
-        ).dropna(subset=['submission_time'])  # Remove fragments without matching tasks
+        fragments_df["frag_nr"] = fragments_df.groupby("id").cumcount() + 1
+
+        fragments_df = fragments_df.join(
+            tasks_df.set_index("id")[["submission_time"]],
+            on="id",
+            how="left"
+        )
+
+        cum_dur = fragments_df.groupby("id")["duration"].cumsum()
+
+        fragments_df["submission_time"] = fragments_df["submission_time"] + pd.to_timedelta(cum_dur, unit="ms")
+        fragments_df = fragments_df.drop(columns=["frag_nr"])
 
         logger.info(f"📊 Loaded {len(tasks_df)} tasks, {len(fragments_df)} fragments")
 
@@ -56,88 +140,25 @@ class TimedKafkaProducer:
 
         # Get time range and create windows
         start_time = tasks_df['submission_time'].min()
-        end_time = tasks_df['submission_time'].max()
+        end_time = fragments_df['submission_time'].max()
         total_duration = (end_time - start_time).total_seconds()
 
         logger.info(f"⏰ Trace time span: {start_time} to {end_time} ({total_duration / 3600:.1f} hours)")
+        
+        #now we should make 2 threads for streaming tasks and fragments
+        #in both threads we do the follwoing:
+        tasks_th = threading.Thread(target=self.tasks_streaming_thread, args=(tasks_df, start_time, ))
+        frags_th = threading.Thread(target=self.fragments_streaming_thread, args=(fragments_df, start_time, ))
 
-        # Create 5-minute windows
-        window_size = timedelta(minutes=5)
-        current_window_start = start_time
-        window_count = 0
+        tasks_th.start()
+        frags_th.start()
 
-        while current_window_start < end_time and not self.stop_streaming.is_set():
-            current_window_end = current_window_start + window_size
-            window_count += 1
+        logger.info("Started producer threads")
 
-            # Get data for this specific time window
-            window_tasks = tasks_df[
-                (tasks_df['submission_time'] >= current_window_start) &
-                (tasks_df['submission_time'] < current_window_end)
-                ]
+        tasks_th.join()
+        frags_th.join()
 
-            window_fragments = fragments_df[
-                (fragments_df['submission_time'] >= current_window_start) &
-                (fragments_df['submission_time'] < current_window_end)
-                ]
-
-            logger.info(
-                f"📤 Window {window_count} ({current_window_start.strftime('%H:%M:%S')}-{current_window_end.strftime('%H:%M:%S')}): "
-                f"{len(window_tasks)} tasks, {len(window_fragments)} fragments"
-            )
-
-            if len(window_tasks) > 0 or len(window_fragments) > 0:
-                # Stream tasks for this window
-                for _, row in window_tasks.iterrows():
-                    if self.stop_streaming.is_set():
-                        break
-
-                    key = {'id': int(row['id'])}
-                    value = {
-                        'submission_time': row['submission_time'].isoformat(),
-                        'duration': int(row['duration']),
-                        'cpu_count': int(row['cpu_count']),
-                        'cpu_capacity': float(row['cpu_capacity']),
-                        'mem_capacity': int(row['mem_capacity'])
-                    }
-                    self.producer.send('tasks', key=key, value=value)
-
-                # Stream fragments for this window - BATCH SEND WITH SMALL DELAYS
-                fragment_batch_size = 50  # Send in small batches
-                for i in range(0, len(window_fragments), fragment_batch_size):
-                    if self.stop_streaming.is_set():
-                        break
-
-                    batch = window_fragments.iloc[i:i + fragment_batch_size]
-                    for _, row in batch.iterrows():
-                        key = {'id': int(row['id'])}
-                        value = {
-                            'duration': int(row['duration']),
-                            'cpu_usage': float(row['cpu_usage']),
-                            'submission_time': row['submission_time'].isoformat()
-                        }
-                        self.producer.send('fragments', key=key, value=value)
-
-                    # Small delay between batches within the window
-                    time.sleep(0.5)
-
-                self.producer.flush()
-
-            # *** CRITICAL: Wait full 60 seconds before next window ***
-            logger.info(f"⏱️  Waiting 60 seconds before next window...")
-            for i in range(60):
-                if self.stop_streaming.is_set():
-                    logger.info("🛑 Streaming stopped by user")
-                    return {'total_tasks': len(tasks_df), 'total_fragments': len(fragments_df)}
-                time.sleep(1)
-
-                # Log countdown every 15 seconds
-                if i % 15 == 0 and i > 0:
-                    logger.info(f"⏱️  {60 - i} seconds remaining...")
-
-            current_window_start = current_window_end
-
-        logger.info("✅ All windows streamed")
+        logger.info("✅ All data streamed")
         return {
             'total_tasks': len(tasks_df),
             'total_fragments': len(fragments_df)

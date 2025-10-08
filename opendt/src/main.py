@@ -4,7 +4,7 @@ import json
 import os
 import threading
 import logging
-from flask import Flask, render_template_string, jsonify
+from flask import Flask, render_template, jsonify
 from kafka_producer import TimedKafkaProducer
 from kafka_consumer import DigitalTwinConsumer
 from opendc_runner import OpenDCRunner
@@ -51,18 +51,17 @@ class OpenDTOrchestrator:
         try:
             # Initialize components
             self.producer = TimedKafkaProducer(self.kafka_servers)
-            self.consumer = DigitalTwinConsumer(self.kafka_servers)
-
-            # Start producer thread
-            self.producer_thread = threading.Thread(target=self.run_producer, daemon=False)
-            self.producer_thread.start()
-
-            # Wait for initial data
-            time.sleep(8)
+            self.consumer = DigitalTwinConsumer(self.kafka_servers, f"OpenDT_telemetry")
 
             # Start consumer thread
             self.consumer_thread = threading.Thread(target=self.run_consumer, daemon=False)
             self.consumer_thread.start()
+
+            time.sleep(5)
+
+            # Start producer thread
+            self.producer_thread = threading.Thread(target=self.run_producer, daemon=False)
+            self.producer_thread.start()
 
             self.state['status'] = 'running'
             logger.info("✅ System started successfully")
@@ -141,6 +140,8 @@ class OpenDTOrchestrator:
                     break
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             logger.error(f"Consumer error: {e}")
 
     def run_simulation(self, batch_data):
@@ -155,8 +156,8 @@ class OpenDTOrchestrator:
         topology_path = '/app/config/topology_template.json'
         if os.path.exists(topology_path):
             with open(topology_path, 'r') as f:
-                topology_data = json.load(f)
-        else:
+               topology_data = json.load(f)
+        else: 
             topology_data = {
                 "clusters": [{
                     "name": "C01",
@@ -170,6 +171,7 @@ class OpenDTOrchestrator:
             }
 
         # Run simulation
+        #
         results = self.opendc_runner.run_simulation(
             tasks_data=tasks_data,
             fragments_data=fragments_data,
@@ -187,116 +189,7 @@ orchestrator = OpenDTOrchestrator()
 # Web Dashboard
 @app.route('/')
 def dashboard():
-    return render_template_string("""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>OpenDT Digital Twin</title>
-        <style>
-            body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-            .container { max-width: 1200px; margin: 0 auto; }
-            .header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-            .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
-            .metric { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-            .metric h3 { margin: 0 0 10px 0; color: #2c3e50; }
-            .metric .value { font-size: 24px; font-weight: bold; color: #27ae60; }
-            .controls { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-            .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
-            .btn-primary { background: #3498db; color: white; }
-            .btn-danger { background: #e74c3c; color: white; }
-            .status-running { color: #27ae60; font-weight: bold; }
-            .status-stopped { color: #e74c3c; font-weight: bold; }
-            .status-stopping { color: #f39c12; font-weight: bold; }
-            .data { background: white; padding: 20px; border-radius: 8px; font-family: monospace; margin-bottom: 20px; }
-            .window-info { background: #ecf0f1; padding: 10px; border-radius: 4px; margin-bottom: 10px; }
-        </style>
-        <script>
-            function startSystem() {
-                fetch('/api/start', {method: 'POST'})
-                    .then(r => r.json())
-                    .then(data => { alert(data.message); setTimeout(() => location.reload(), 2000); });
-            }
-            function stopSystem() {
-                fetch('/api/stop', {method: 'POST'})
-                    .then(r => r.json())
-                    .then(data => { alert(data.message); setTimeout(() => location.reload(), 1000); });
-            }
-            setInterval(() => location.reload(), 10000); // Auto-refresh every 10s
-        </script>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>🏢 OpenDT Digital Twin Dashboard</h1>
-                <p>Real-time datacenter simulation with 5-minute time windows</p>
-            </div>
-
-            <div class="controls">
-                <h3>System Controls</h3>
-                <button class="btn btn-primary" onclick="startSystem()">▶️ Start System</button>
-                <button class="btn btn-danger" onclick="stopSystem()">⏹️ Stop System</button>
-                <span class="status-{{ state.status }}">
-                    ● Status: {{ state.status.title() }}
-                </span>
-
-                {% if state.current_window %}
-                <div class="window-info">
-                    <strong>Current Window:</strong> {{ state.current_window }}
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="metrics">
-                <div class="metric">
-                    <h3>🔄 Processing</h3>
-                    <div class="value">{{ state.cycle_count }}</div>
-                    <small>Optimization Cycles</small>
-                </div>
-
-                <div class="metric">
-                    <h3>📊 Workload</h3>
-                    <div class="value">{{ state.total_tasks or 0 }}</div>
-                    <small>Total Tasks</small>
-                </div>
-
-                {% if state.last_simulation %}
-                <div class="metric">
-                    <h3>⚡ Energy</h3>
-                    <div class="value">{{ "%.2f"|format(state.last_simulation.energy_kwh) }}</div>
-                    <small>kWh Usage</small>
-                </div>
-
-                <div class="metric">
-                    <h3>💻 CPU</h3>
-                    <div class="value">{{ "%.1f"|format(state.last_simulation.cpu_utilization * 100) }}%</div>
-                    <small>Utilization</small>
-                </div>
-
-                <div class="metric">
-                    <h3>⏱️ Runtime</h3>
-                    <div class="value">{{ "%.1f"|format(state.last_simulation.runtime_hours or 0) }}h</div>
-                    <small>Simulation Time</small>
-                </div>
-                {% endif %}
-            </div>
-
-            {% if state.last_simulation %}
-            <div class="data">
-                <h3>📈 Latest OpenDC Results</h3>
-                <pre>{{ state.last_simulation | tojson(indent=2) }}</pre>
-            </div>
-            {% endif %}
-
-            {% if state.last_optimization %}
-            <div class="data">
-                <h3>🤖 LLM Optimization</h3>
-                <pre>{{ state.last_optimization | tojson(indent=2) }}</pre>
-            </div>
-            {% endif %}
-        </div>
-    </body>
-    </html>
-    """, state=orchestrator.state)
+    return render_template("index.html", state=orchestrator.state)
 
 
 @app.route('/api/status')
