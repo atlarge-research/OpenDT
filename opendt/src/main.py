@@ -4,6 +4,7 @@ import json
 import os
 import threading
 import logging
+import hashlib
 from flask import Flask, render_template, jsonify
 from kafka_producer import TimedKafkaProducer
 from kafka_consumer import DigitalTwinConsumer
@@ -14,6 +15,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# --- tuning knobs for the improvement loop ---
+IMPROVEMENT_DELTA = 0.05  # minimum score improvement to accept a topology
+WINDOW_TRY_BUDGET_SEC = 30.0  # hard time budget per data window
+MAX_TRIES_PER_WINDOW = 8  # cap to avoid runaway trials even if simulations are super fast
+NO_IMPROVEMENT_STOP_AFTER = 3  # stop early if we see this many consecutive non-better proposals
 
 
 class OpenDTOrchestrator:
@@ -28,7 +35,16 @@ class OpenDTOrchestrator:
             'last_optimization': None,
             'total_tasks': 0,
             'total_fragments': 0,
-            'current_window': None
+            'current_window': None,
+            'current_topology': None,
+            'best_config': None,
+            'topology_updates': 0,
+            # live optimization diagnostics (per window)
+            'window_baseline_score': None,
+            'window_best_score': None,
+            'window_trials': 0,
+            'window_accepted': False,
+            'window_time_used_sec': 0.0,
         }
 
         # Components
@@ -42,8 +58,84 @@ class OpenDTOrchestrator:
         self.producer_thread = None
         self.consumer_thread = None
 
+        # Topology file plumbing
+        self.topology_path = '/app/config/topology_template.json'
+        self.last_topology_hash = None
+
+        # Load initial topology and start file watcher (keeps dashboard in sync)
+        self.load_initial_topology()
+        self.start_topology_watcher()
+
+    # ---------------- Topology I/O ----------------
+
+    def load_initial_topology(self):
+        if os.path.exists(self.topology_path):
+            with open(self.topology_path, 'r') as f:
+                topo = json.load(f)
+            self.state['current_topology'] = topo
+            self.last_topology_hash = self._topo_hash(topo)
+            logger.info("📄 Loaded initial topology configuration")
+        else:
+            logger.warning("⚠️ Topology not found, a default will be used at runtime")
+
+    def start_topology_watcher(self):
+        self._topology_last_mtime = 0.0
+        self._watch_thread = threading.Thread(target=self._watch_topology_file, daemon=True)
+        self._watch_thread.start()
+
+    def _watch_topology_file(self):
+        while not self.stop_event.is_set():
+            try:
+                if os.path.exists(self.topology_path):
+                    mtime = os.path.getmtime(self.topology_path)
+                    if mtime != self._topology_last_mtime:
+                        with open(self.topology_path, 'r') as f:
+                            new_topology = json.load(f)
+                        self.state['current_topology'] = new_topology
+                        self.state['topology_updates'] = (self.state.get('topology_updates') or 0) + 1
+                        self._topology_last_mtime = mtime
+                        logger.info("🔁 Topology file changed; dashboard state updated")
+            except Exception as e:
+                logger.warning(f"Topology watcher error: {e}")
+            time.sleep(0.5)
+
+    def _topo_hash(self, topo: dict) -> str:
+        try:
+            canonical = json.dumps(topo, sort_keys=True, separators=(',', ':'))
+        except Exception:
+            canonical = str(topo)
+        return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+
+    def update_topology_file(self, new_topology: dict) -> bool:
+        if not new_topology:
+            return False
+        new_hash = self._topo_hash(new_topology)
+        if self.last_topology_hash == new_hash:
+            logger.info("↩️ Skipping apply: topology identical to current (no-op)")
+            return False
+        try:
+            backup_path = self.topology_path + '.backup'
+            if os.path.exists(self.topology_path):
+                with open(self.topology_path, 'r') as f:
+                    backup_data = json.load(f)
+                with open(backup_path, 'w') as f:
+                    json.dump(backup_data, f, indent=2)
+
+            with open(self.topology_path, 'w') as f:
+                json.dump(new_topology, f, indent=2)
+
+            self.state['current_topology'] = new_topology
+            self.state['topology_updates'] += 1
+            self.last_topology_hash = new_hash
+            logger.info(f"✅ Applied new topology (update #{self.state['topology_updates']})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update topology file: {e}")
+            return False
+
+    # ---------------- Lifecycle ----------------
+
     def start_system(self):
-        """Start the complete digital twin system with proper controls"""
         logger.info("🚀 Starting OpenDT Digital Twin System")
         self.state['status'] = 'starting'
         self.stop_event.clear()
@@ -108,8 +200,17 @@ class OpenDTOrchestrator:
         except Exception as e:
             logger.error(f"Producer error: {e}")
 
+    def _score(self, sim_results: dict) -> float:
+        energy = sim_results.get('energy_kwh', 5.0) or 0.0
+        runtime = sim_results.get('runtime_hours', 1.0) or 0.0
+        return (2.0 * float(energy)) + (1.0 * float(runtime))
+
     def run_consumer(self):
-        """Process streaming data and run optimization cycles"""
+        """For each window:
+           1) baseline sim on current topology
+           2) iterative proposal->probe loop within a strict time budget
+           3) apply the best found only if it's better than baseline by epsilon
+        """
         try:
             logger.info("📥 Starting digital twin consumer...")
 
@@ -123,18 +224,104 @@ class OpenDTOrchestrator:
 
                 logger.info(f"🔄 Processing cycle {cycle}")
 
-                # Run OpenDC simulation
-                sim_results = self.run_simulation(batch_data)
-                self.state['last_simulation'] = sim_results
+                # ---- 1) BASELINE on current topology
+                baseline_results = self.run_simulation(batch_data)
+                self.state['last_simulation'] = baseline_results
+                baseline_score = self._score(baseline_results)
 
-                # Run LLM optimization
-                if self.openai_key:
-                    opt_results = self.optimizer.optimize(sim_results, batch_data)
+                # init per-window stats
+                self.state['window_baseline_score'] = round(baseline_score, 3)
+                self.state['window_best_score'] = round(baseline_score, 3)
+                self.state['window_trials'] = 0
+                self.state['window_accepted'] = False
+                self.state['window_time_used_sec'] = 0.0
+
+                best_topology = self.state['current_topology']
+                best_score = baseline_score
+
+                # ---- 2) IMPROVEMENT LOOP (strict time budget)
+                deadline = time.monotonic() + WINDOW_TRY_BUDGET_SEC
+                tries = 0
+                no_improve_streak = 0
+                seen_hashes = {self._topo_hash(best_topology) if best_topology else ''}
+
+                while time.monotonic() < deadline and tries < MAX_TRIES_PER_WINDOW and not self.stop_event.is_set():
+                    tries += 1
+
+                    # single proposal from optimizer (LLM if key present, else rule-based)
+                    opt_results = self.optimizer.optimize(
+                        baseline_results,  # give current performance context
+                        batch_data,
+                        current_topology=best_topology  # IMPORTANT: always attempt to improve the current-best
+                    )
                     self.state['last_optimization'] = opt_results
-                    logger.info(f"🤖 Optimization: {opt_results.get('action_taken', 'none')}")
 
-                # Short cycle delay
-                if not self.stop_event.wait(15):  # 15 second cycles
+                    proposed = opt_results.get('new_topology')
+                    if not proposed:
+                        logger.info("🧪 Proposal had no topology; skipping this try")
+                        no_improve_streak += 1
+                        if no_improve_streak >= NO_IMPROVEMENT_STOP_AFTER:
+                            logger.info("⏹️ Early stop: consecutive non-improvements")
+                            break
+                        continue
+
+                    ph = self._topo_hash(proposed)
+                    if ph in seen_hashes:
+                        logger.info("🔁 Duplicate proposal; skipping probe run")
+                        no_improve_streak += 1
+                        if no_improve_streak >= NO_IMPROVEMENT_STOP_AFTER:
+                            logger.info("⏹️ Early stop: consecutive non-improvements (dupes)")
+                            break
+                        continue
+                    seen_hashes.add(ph)
+
+                    # probe with OpenDC
+                    probe_results = self.opendc_runner.run_simulation(
+                        tasks_data=batch_data.get('tasks_sample', []),
+                        fragments_data=batch_data.get('fragments_sample', []),
+                        topology_data=proposed
+                    )
+                    proposed_score = self._score(probe_results)
+
+                    # accept into *window-best* only if better
+                    if proposed_score < (best_score - IMPROVEMENT_DELTA):
+                        best_topology = proposed
+                        best_score = proposed_score
+                        no_improve_streak = 0
+                        logger.info(
+                            f"🏆 Window-best improved: {proposed_score:.3f} < {self.state['window_best_score']:.3f}")
+                        self.state['window_best_score'] = round(best_score, 3)
+                    else:
+                        logger.info(
+                            f"🙅 Not better this try: proposed {proposed_score:.3f} vs best {best_score:.3f}"
+                        )
+                        no_improve_streak += 1
+
+                    # update live stats
+                    self.state['window_trials'] = tries
+                    self.state['window_time_used_sec'] = round(
+                        WINDOW_TRY_BUDGET_SEC - max(0.0, deadline - time.monotonic()), 2)
+
+                # ---- 3) APPLY best (if better than baseline)
+                if best_score < (baseline_score - IMPROVEMENT_DELTA) and best_topology is not None:
+                    applied = self.update_topology_file(best_topology)
+                    self.state['window_accepted'] = bool(applied)
+                    if applied:
+                        self.state['best_config'] = {
+                            'config': best_topology,
+                            'score': round(best_score, 3)
+                        }
+                        logger.info(
+                            f"✅ Applied window-best: {best_score:.3f} < baseline {baseline_score:.3f} "
+                            f"(trials={tries}, time_used≈{self.state['window_time_used_sec']}s)"
+                        )
+                else:
+                    logger.info(
+                        f"📎 No commit this window (best {best_score:.3f} vs baseline {baseline_score:.3f})"
+                    )
+
+                # soft pacing between windows (do not block kafka timing)
+                if not self.stop_event.wait(0.1):
                     continue
                 else:
                     break
@@ -144,6 +331,8 @@ class OpenDTOrchestrator:
             traceback.print_exc()
             logger.error(f"Consumer error: {e}")
 
+    # ---------------- Simulation wrapper ----------------
+
     def run_simulation(self, batch_data):
         """Run OpenDC simulation with windowed data"""
         logger.info("🔄 Running OpenDC simulation...")
@@ -151,33 +340,12 @@ class OpenDTOrchestrator:
         # Get tasks and fragments from batch
         tasks_data = batch_data.get('tasks_sample', [])
         fragments_data = batch_data.get('fragments_sample', [])
-
-        # Load current topology
-        topology_path = '/app/config/topology_template.json'
-        if os.path.exists(topology_path):
-            with open(topology_path, 'r') as f:
-               topology_data = json.load(f)
-        else: 
-            topology_data = {
-                "clusters": [{
-                    "name": "C01",
-                    "hosts": [{
-                        "name": "H01",
-                        "count": 2,
-                        "cpu": {"coreCount": 16, "coreSpeed": 2400},
-                        "memory": {"memorySize": 34359738368}
-                    }]
-                }]
-            }
-
-        # Run simulation
-        #
+        topology_data = self.state.get('current_topology')
         results = self.opendc_runner.run_simulation(
             tasks_data=tasks_data,
             fragments_data=fragments_data,
             topology_data=topology_data
         )
-
         logger.info(f"📊 Simulation Results: {results}")
         return results
 
@@ -213,5 +381,24 @@ def api_stop():
     return jsonify({'message': 'System already stopped'})
 
 
+@app.route('/api/topology')
+def api_topology():
+    return jsonify({
+        'current_topology': orchestrator.state.get('current_topology'),
+        'best_config': orchestrator.state.get('best_config'),
+        'topology_updates': orchestrator.state.get('topology_updates', 0)
+    })
+
+
+@app.route('/api/reset_topology', methods=['POST'])
+def api_reset_topology():
+    try:
+        orchestrator.load_initial_topology()
+        return jsonify({'message': 'Topology reset to initial configuration'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
+    # NOTE: ensure your index.html is under ./templates/index.html
     app.run(host='0.0.0.0', port=8080, debug=False, threaded=True)

@@ -5,10 +5,10 @@
       "hosts": [
         {
           "name": "H01",
-          "count": 2,
+          "count": 269,
           "cpu": {
             "coreCount": 16,
-            "coreSpeed": 2400
+            "coreSpeed": 2100
           },
           "memory": {
             "memorySize": 34359738368
