@@ -363,3 +363,76 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 @media (max-width: 720px){
   .window-pill{ display:none; } /* optional: hide on small screens */
 }
+
+/*  Charts: */
+
+/* 1) Single-column stack like your other sections */
+.section-stack{
+  display:flex;
+  flex-direction:column;
+  gap:18px;                 /* same spacing as .section-grid */
+  margin-bottom:22px;       /* match other sections */
+  width:100%;
+}
+
+/* 2) Ensure chart cards span the full available width */
+.section-stack .card{
+  width:100%;
+  border-radius: var(--r-lg);
+  padding:18px;             /* matches .card default */
+}
+
+/* 3) Fluid Plotly container inside each card */
+.chart-wrap{
+  width:100%;
+  /* If you want a fixed min height per chart, set it on .chart below */
+}
+
+.chart{
+  width:100%;
+  min-height:360px;         /* tweak if you want taller charts */
+}
+
+/* 4) Force Plotly internals to fill the parent (prevents fixed widths) */
+.plotly,
+.plot-container,
+.plotly-graph-div{
+  width:100% !important;
+  height:100% !important;
+}
+
+/* 5) Optional: soften Plotly’s range slider background to fit your glass UI */
+.plotly .rangeslider{
+  background: color-mix(in srgb, var(--row-bg) 70%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+}
+
+/* Charts: same width and fully responsive */
+.section-stack { display:flex; flex-direction:column; gap:18px; width:100%; }
+.section-stack .card { width:100%; }
+
+.chart-wrap { width:100%; }
+.chart { width:100%; min-height:360px; }
+
+/* Force Plotly internals to be fluid */
+.plotly, .plot-container, .plotly-graph-div {
+  width:100% !important;
+  height:100% !important;
+}
+
+/* Plotly modebar (toolbar) — dark theme */
+.plotly .modebar {
+  background: transparent;
+}
+.plotly .modebar-btn svg {
+  fill: #cbd5e1 !important;         /* slate-300 */
+}
+.plotly .modebar-btn:hover svg,
+.plotly .modebar-btn.active svg {
+  fill: #22d3ee !important;         /* accent on hover/active */
+}
+.plotly .modebar-btn:hover {
+  background: rgba(255,255,255,0.08) !important;
+  border-radius: 8px;
+}

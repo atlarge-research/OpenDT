@@ -1,0 +1,6 @@
+services:
+  opendt:
+    # run Flask directly (skip /entrypoint.sh)
+    entrypoint: ["python","-u","/app/src/main.py"]
+    environment:
+      - OPENDT_DATA_DIR=/app/data
