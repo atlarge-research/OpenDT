@@ -389,21 +389,6 @@ def api_accept_recommendation():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/reject_recommendation', methods=['POST'])
-def api_reject_recommendation():
-    try:
-        # Clear the last optimization state to indicate rejection
-        # orchestrator.state['last_optimization'] = None
-        orchestrator.state['window_accepted'] = False
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Recommendation rejected'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error rejecting recommendation: {e}")
-        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
