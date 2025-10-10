@@ -1,4 +1,4 @@
-#!/bin/sh
+﻿#!/bin/sh
 set -e
 
 # Recompute JAVA_HOME safely in case image/base changes
