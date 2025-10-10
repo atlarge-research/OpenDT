@@ -201,8 +201,8 @@ class OpenDTOrchestrator:
         try:
             logger.info("📡 Starting timed telemetry producer...")
             stats = self.producer.stream_parquet_data_timed(
-                tasks_file='/app/data/tasks.parquet',
-                fragments_file='/app/data/fragments.parquet'
+                tasks_file='/../app/data/tasks.parquet',
+                fragments_file='/../app/data/fragments.parquet'
             )
             self.state['total_tasks'] = stats['total_tasks']
             self.state['total_fragments'] = stats['total_fragments']

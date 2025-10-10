@@ -7,8 +7,8 @@
           "name": "H01",
           "count": 2,
           "cpu": {
-            "coreCount": 64,
-            "coreSpeed": 2800
+            "coreCount": 32,
+            "coreSpeed": 3200
           },
           "memory": {
             "memorySize": 34359738368
@@ -18,8 +18,8 @@
           "name": "H02",
           "count": 3,
           "cpu": {
-            "coreCount": 24,
-            "coreSpeed": 1900
+            "coreCount": 16,
+            "coreSpeed": 2100
           },
           "memory": {
             "memorySize": 34359738368
