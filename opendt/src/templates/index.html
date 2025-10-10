@@ -5,22 +5,6 @@
   <title>OpenDT Digital Twin</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <style>
-    /* one-column stack */
-    .section-stack { display: flex; flex-direction: column; gap: 1.25rem; width: 100%; }
-
-    /* make chart cards fill like the rest */
-    .section-stack .card { width: 100%; }
-
-    /* chart box sizing: match card padding and make plot fill width */
-    .chart-wrap { width: 100%; }
-    .chart { width: 100%; min-height: 360px; }  /* height you like */
-
-    /* Plotly containers sometimes keep fixed widths; force fluid */
-    .plotly, .plot-container, .plotly-graph-div { width: 100% !important; height: 100% !important; }
-  </style>
-
 </head>
 <body>
   <div class="container">
@@ -169,36 +153,14 @@
       <pre class="json-only" id="topologyJSON">null</pre>
     </section>
 
-        <!-- Best Config -->
+    <!-- Best Config -->
     <section class="card glass lift">
       <h3>🏅 Best Configuration</h3>
       <div class="ui-only"><div id="bestScore" class="badge">Score: —</div></div>
       <pre class="json-only" id="bestJSON">null</pre>
     </section>
+  </div>
 
-    <!-- Charts (single column, same card style) -->
-    <section class="section">
-      <div class="card glass lift">
-        <h3>CPU — Real vs Sim</h3>
-        <div id="chart-cpu" class="chart"></div>
-      </div>
-
-      <div class="card glass lift" style="margin-top:18px;">
-        <h3>Power — Real vs Sim</h3>
-        <div id="chart-power" class="chart"></div>
-      </div>
-
-      <div class="card glass lift" style="margin-top:18px;">
-        <h3>Cumulative Energy (kWh)</h3>
-        <div id="chart-energy" class="chart"></div>
-      </div>
-    </section>
-
-  </div> <!-- END .container -->
-
-  <!-- Load Plotly BEFORE your app script -->
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="{{ url_for('static', filename='index.js') }}"></script>
 </body>
 </html>
-
