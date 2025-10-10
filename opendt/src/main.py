@@ -19,7 +19,7 @@ app = Flask(__name__)
 # --- tuning knobs for the improvement loop ---
 IMPROVEMENT_DELTA = 0.05  # minimum score improvement to accept a topology
 WINDOW_TRY_BUDGET_SEC = 30.0  # hard time budget per data window
-MAX_TRIES_PER_WINDOW = 8  # cap to avoid runaway trials even if simulations are super fast
+MAX_TRIES_PER_WINDOW = 1  # cap to avoid runaway trials even if simulations are super fast
 NO_IMPROVEMENT_STOP_AFTER = 3  # stop early if we see this many consecutive non-better proposals
 
 
@@ -31,6 +31,7 @@ class OpenDTOrchestrator:
         self.state = {
             'status': 'stopped',
             'cycle_count': 0,
+            'cycle_count_opt': 0,
             'last_simulation': None,
             'last_optimization': None,
             'total_tasks': 0,
@@ -245,7 +246,7 @@ class OpenDTOrchestrator:
                 ):
                     tries += 1
                     opt = self.optimizer.optimize(baseline, batch_data, current_topology=best_topology)
-                    self.state['last_optimization'] = opt
+                    
 
                     proposed = opt.get('new_topology')
                     if not proposed:
@@ -260,6 +261,14 @@ class OpenDTOrchestrator:
                         fragments_data=batch_data.get('fragments_sample', []),
                         topology_data=proposed
                     )
+
+                    self.state['last_optimization'] = opt
+                    self.state['last_optimization']['energy_kwh'] = probe.get('energy_kwh', None)
+                    self.state['last_optimization']['runtime_hours'] = probe.get('runtime_hours', None)
+                    self.state['last_optimization']['cpu_utilization'] = probe.get('cpu_utilization',None)
+                    self.state['last_optimization']['max_power_draw'] = probe.get('max_power_draw', None)
+                    
+                    self.state['cycle_count_opt'] += 1
                     score = self._score(probe)
                     if score < best_score - IMPROVEMENT_DELTA:
                         best_topology, best_score = proposed, score
@@ -269,10 +278,10 @@ class OpenDTOrchestrator:
 
                 # 3) apply only if better than baseline
                 if best_score < baseline_score - IMPROVEMENT_DELTA and best_topology:
-                    if self.update_topology_file(best_topology):
-                        self.state['window_accepted'] = True
-                        self.state['best_config'] = {'config': best_topology, 'score': round(best_score, 3)}
-                        logger.info(f"✅ Applied improved topology: {best_score:.3f} < {baseline_score:.3f}")
+                    # if self.update_topology_file(best_topology):
+                        # self.state['window_accepted'] = True
+                    self.state['best_config'] = {'config': best_topology, 'score': round(best_score, 3)}
+                    # logger.info(f"✅ Applied improved topology: {best_score:.3f} < {baseline_score:.3f}")
                 else:
                     logger.info(f"📎 No commit (best {best_score:.3f} vs baseline {baseline_score:.3f})")
 
@@ -353,6 +362,50 @@ def api_reset_topology():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/accept_recommendation', methods=['POST'])
+def api_accept_recommendation():
+    try:
+        # Get the latest recommendation from state
+        last_opt = orchestrator.state.get('last_optimization', {})
+        proposed_topology = last_opt.get('new_topology')
+        
+        if not proposed_topology:
+            return jsonify({'error': 'No pending recommendation to accept'}), 400
+            
+        # Apply the topology update
+        if orchestrator.update_topology_file(proposed_topology):
+            # Update best config if score is available
+            
+            orchestrator.state['window_accepted'] = True
+            return jsonify({
+                'status': 'success',
+                'message': 'Recommendation accepted and topology updated'
+            })
+        else:
+            return jsonify({'error': 'Failed to update topology'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error accepting recommendation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reject_recommendation', methods=['POST'])
+def api_reject_recommendation():
+    try:
+        # Clear the last optimization state to indicate rejection
+        # orchestrator.state['last_optimization'] = None
+        orchestrator.state['window_accepted'] = False
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Recommendation rejected'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error rejecting recommendation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     # NOTE: ensure index.html is under ./templates/index.html
-    app.run(host='0.0.0.0', port=8080, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=8081, debug=True, threaded=True)

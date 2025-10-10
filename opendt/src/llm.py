@@ -241,7 +241,7 @@ Example:
         except ImportError:
             return self.rule_based_optimization(sim_results, batch_data, current_topology,
                                                 reason="langchain-openai not installed")
-        except Exception as e:
+        except Exception as e:  
             logger.error(f"LLM call failed: {e}")
             return self.rule_based_optimization(sim_results, batch_data, current_topology,
                                                 reason=f"LLM API Error: {str(e)}")

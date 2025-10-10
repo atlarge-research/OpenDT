@@ -206,6 +206,60 @@ body{
 .panel{margin-top:12px; border-radius:12px; border:1px solid var(--hairline); background:var(--surface-weak)}
 .panel-title{padding:10px 12px; border-bottom:1px solid var(--hairline); font-weight:700; background:linear-gradient(180deg, rgba(255,255,255,.25), transparent)}
 
+/* Recommendation action buttons */
+.rec-actions {
+    display: flex;
+    margin-top: 1rem;
+    padding: 1rem;
+    justify-content: center;
+}
+
+.btn-success {
+    background: linear-gradient(180deg, 
+        color-mix(in srgb, var(--green) 70%, white 30%),
+        color-mix(in srgb, var(--green) 90%, white 10%)
+    );
+    border: 1px solid rgba(255,255,255,.35);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 8px 20px rgba(52,199,89,.15);
+    backdrop-filter: blur(8px);
+}
+
+.btn-success:hover {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--green) 65%, white 35%),
+        color-mix(in srgb, var(--green) 85%, white 15%)
+    );
+    transform: translateY(-1px);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 12px 28px rgba(52,199,89,.2);
+}
+
+.btn-danger {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--red) 70%, white 30%),
+        color-mix(in srgb, var(--red) 90%, white 10%)
+    );
+    border: 1px solid rgba(255,255,255,.35);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 8px 20px rgba(255,59,48,.15);
+    backdrop-filter: blur(8px);
+}
+
+.btn-danger:hover {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--red) 65%, white 35%),
+        color-mix(in srgb, var(--red) 85%, white 15%)
+    );
+    transform: translateY(-1px);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 12px 28px rgba(255,59,48,.2);
+}
+
 /* 8) Table */
 table{width:100%; border-collapse:separate; border-spacing:0 10px}
 thead th{font-size:12px; color:var(--ink-muted); text-align:left; padding:6px 10px}

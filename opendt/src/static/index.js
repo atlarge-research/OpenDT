@@ -71,12 +71,12 @@ function renderMetrics(s){
   if (llmTypeEl) llmTypeEl.innerHTML = typ !== '—' ? `<span class="badge">${typ}</span>` : '—';
 }
 
-function renderOpenDC(sim){
+function renderOpenDC(sim,s){
   $('#kvEnergy')   && ($('#kvEnergy').textContent   = fmt(sim.energy_kwh, 2));
   $('#kvCPU')      && ($('#kvCPU').textContent      = pct(sim.cpu_utilization, 1));
   $('#kvRuntime')  && ($('#kvRuntime').textContent  = fmt(sim.runtime_hours, 1));
   $('#kvMaxPower') && ($('#kvMaxPower').textContent = fmt(sim.max_power_draw, 0));
-  $('#kvSimType')  && ($('#kvSimType').textContent  = sim.status || '—');
+  $('#kvSimType')  && ($('#kvSimType').textContent  = fmt(s.cycle_count_opt) ?? '—');
 
   const pre = $('#simJSON');
   const txt = JSON.stringify(sim || null, null, 2);
@@ -141,6 +141,33 @@ function renderBest(best){
   if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
+// ---- Recommendation Action -------------------------------------------------
+async function acceptRecommendation() {
+  try {
+    const btn = $('#btnAcceptRec');
+    if (btn) btn.disabled = true;
+    
+    const response = await fetch('/api/accept_recommendation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Refresh the UI
+    await poll();
+  } catch(e) {
+    console.error('Failed to accept recommendation:', e);
+  } finally {
+    const btn = $('#btnAcceptRec');
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ---- polling -------------------------------------------------
 async function poll(){
   try{
@@ -158,7 +185,7 @@ async function poll(){
     }
 
     renderMetrics(s);
-    renderOpenDC(s.last_simulation || {});
+    renderOpenDC(s.last_optimization || {},s);
     renderLLM(s.last_optimization || {});
     renderTopoTable(s.current_topology || null);
     renderBest(s.best_config || null);
