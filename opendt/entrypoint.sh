@@ -19,6 +19,6 @@ if [ -f "$RUNNER" ]; then
 fi
 
 #give perms to run script
-chmod 777 ./run.sh
+#chmod 777 /app/run.sh
 
 exec "$@"

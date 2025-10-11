@@ -62,3 +62,12 @@ kafka/kafka-data/
 reader/
 
 .venv
+
+
+####backup files####
+config/*.backup
+
+####Pycharm####
+__pycache__/
+*.py[cod]
+*$py.class

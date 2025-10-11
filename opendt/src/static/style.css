@@ -86,6 +86,47 @@ body{
   box-shadow:var(--shadow-1);
   position:relative; overflow:hidden;
 }
+
+.slo-inputs {
+  padding: 20px;
+  margin-top: 20px;
+  border-radius: 8px;
+}
+
+.input-group {
+  margin-bottom: 16px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.glass-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface-weak);
+  color: var(--ink);
+  font-size: 14px;
+  transition: all var(--dur-quick) var(--ease-spring);
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: var(--blue);
+  background: var(--surface-strong);
+  box-shadow: 0 0 0 2px rgba(0,122,255,0.1);
+}
+
+.glass-btn {
+  margin-top: 8px;
+  width: 100%;
+  justify-content: center;
+}
 .glass::before,.glass::after{content:"";position:absolute;inset:0;pointer-events:none}
 .glass::before{
   background:linear-gradient(to bottom, rgba(255,255,255,.42), transparent 60%);
@@ -197,14 +238,137 @@ body{
 
 /* KV rows */
 .kv{display:grid; grid-template-columns:1fr 1fr; gap:12px}
-.kv>div{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:12px; background:var(--surface-weak); border:1px solid var(--hairline); transition:transform var(--dur-quick), box-shadow var(--dur-quick)}
+.kv>div{display:flex; flex-direction:column; justify-content:space-between; padding:12px 14px; border-radius:12px; background:var(--surface-weak); border:1px solid var(--hairline); transition:transform var(--dur-quick), box-shadow var(--dur-quick)}
 .kv>div:hover{transform:translateY(-1px); box-shadow:var(--shadow-1)}
-.kv span{color:var(--ink-muted); font-size:12px}
+.kv span{color:var(--ink-muted); font-size:12px; margin-bottom:8px}
 .kv strong{font-weight:800}
+
+.slo-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.slo-field {
+    flex: 1;
+    min-width: 140px;
+    height: 32px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.slo-field:focus {
+    outline: none;
+    border-color: var(--blue);
+    background: rgba(255,255,255,0.15);
+}
+
+.slo-field::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+
+/* SLO inputs compact grid */
+.slo-inputs { padding: 8px 12px; }
+.slo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center; }
+.slo-grid .input-group { margin: 0; padding: 2px 4px; }
+.slo-grid label { font-size: 11px; color: var(--ink-muted); margin-bottom: 4px; }
+.slo-grid .glass-input { padding: 6px 8px; border-radius: 8px; font-size: 13px; }
+.slo-actions { grid-column: 1 / -1; display:flex; margin-top: 8px; }
+.slo-actions .glass-btn { width: auto; padding: 8px 12px; margin-left: auto; border-radius: 10px; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .slo-grid { grid-template-columns: 1fr; gap: 12px; }
+  .slo-actions { justify-content: stretch; }
+  .slo-actions .glass-btn { width:100%; margin-left:0 }
+}
+
+/* Pill-style inputs (compact, rounded with right sigil) */
+.pill-input{ display:flex; align-items:center; gap:8px; padding:8px 12px 8px 14px; background:rgba(255,255,255,0.98); border-radius:20px; border:1px solid rgba(0,0,0,0.06); box-shadow:0 4px 12px rgba(16,18,27,0.04); min-height:36px }
+.pill-field{ flex:1; border:0; background:transparent; padding:4px 6px; font-size:13px; color:var(--ink-muted); outline:none; line-height:1 }
+.pill-field::placeholder{ color:var(--ink-muted); opacity:0.7 }
+.pill-sigil{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:4px; border-radius:4px; background:rgba(17,20,25,0.9); color:#fff; font-weight:700; border:0; font-size:9px }
+
+/* subtle inner top highlight to match screenshot */
+.pill-input::before{ content:''; position:absolute; pointer-events:none; inset:auto auto 100% 0; height:1px }
+
+/* make each pill visually separated on wide screens with subtle divider */
+.slo-grid > .input-group { background: transparent }
+.slo-grid > .input-group .pill-input { width: 100% }
+
+.visually-hidden{ position:absolute!important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap }
+
+.slo-submit {
+    margin-top: 16px;
+    padding: 0 14px 14px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.slo-submit .btn {
+    min-width: 120px;
+}
 
 /* panel */
 .panel{margin-top:12px; border-radius:12px; border:1px solid var(--hairline); background:var(--surface-weak)}
 .panel-title{padding:10px 12px; border-bottom:1px solid var(--hairline); font-weight:700; background:linear-gradient(180deg, rgba(255,255,255,.25), transparent)}
+
+/* Recommendation action buttons */
+.rec-actions {
+    display: flex;
+    margin-top: 1rem;
+    padding: 1rem;
+    justify-content: center;
+}
+
+.btn-success {
+    background: linear-gradient(180deg, 
+        color-mix(in srgb, var(--green) 70%, white 30%),
+        color-mix(in srgb, var(--green) 90%, white 10%)
+    );
+    border: 1px solid rgba(255,255,255,.35);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 8px 20px rgba(52,199,89,.15);
+    backdrop-filter: blur(8px);
+}
+
+.btn-success:hover {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--green) 65%, white 35%),
+        color-mix(in srgb, var(--green) 85%, white 15%)
+    );
+    transform: translateY(-1px);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 12px 28px rgba(52,199,89,.2);
+}
+
+.btn-danger {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--red) 70%, white 30%),
+        color-mix(in srgb, var(--red) 90%, white 10%)
+    );
+    border: 1px solid rgba(255,255,255,.35);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 8px 20px rgba(255,59,48,.15);
+    backdrop-filter: blur(8px);
+}
+
+.btn-danger:hover {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--red) 65%, white 35%),
+        color-mix(in srgb, var(--red) 85%, white 15%)
+    );
+    transform: translateY(-1px);
+    box-shadow: 
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 12px 28px rgba(255,59,48,.2);
+}
 
 /* 8) Table */
 table{width:100%; border-collapse:separate; border-spacing:0 10px}
@@ -362,4 +526,15 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 }
 @media (max-width: 720px){
   .window-pill{ display:none; } /* optional: hide on small screens */
+}
+
+
+
+.kv + .kv {
+  margin-top: 2rem; /* Adjust as needed for more/less space */
+}
+
+/* Or, if you want to target just the input group */
+.input-group {
+  margin-top: 1.5rem;
 }

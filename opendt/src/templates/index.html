@@ -97,15 +97,52 @@
     <section class="section-grid">
       <!-- OpenDC Results -->
       <div class="card glass lift">
-        <h3>📈 Latest OpenDC Results</h3>
+        <h3>📈 OpenDC Results for LLM settings</h3>
         <div class="ui-only">
           <div class="kv">
             <div><span>Energy (kWh)</span><strong id="kvEnergy">—</strong></div>
             <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
             <div><span>Runtime (h)</span><strong id="kvRuntime">—</strong></div>
             <div><span>Max Power (W)</span><strong id="kvMaxPower">—</strong></div>
-            <div><span>Status</span><span id="kvSimType" class="badge">—</span></div>
+            <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div> 
+            
           </div>
+          
+
+          <div class="kv">  
+            <div class="input-group">
+              <span>Energy</span>
+              <div class="pill-input">
+                <input type="number" 
+                      id="energy_input" 
+                      class="pill-field" 
+                      placeholder="10"
+                      min="0" 
+                      step="1">
+              </div>
+            </div>
+          
+            <div class="input-group">
+              <span>Runtime</span>
+              <div class="pill-input">
+                <input type="number" 
+                      id="runtime_input" 
+                      class="pill-field" 
+                      placeholder="2"
+                      min="0" 
+                      step="1">
+              </div>
+
+              
+            </div>
+            <div class="rec-actions">
+                <button id="submit_slo" class="btn btn-primary" onclick="submitSLO()">
+                  Submit
+                </button>
+            </div>
+            
+          </div>
+
         </div>
         <pre class="json-only" id="simJSON">null</pre>
       </div>
@@ -124,6 +161,13 @@
           <div class="panel">
             <div class="panel-title">Recommendations</div>
             <ul id="kvLLMRecs"><li>—</li></ul>
+            
+            <!-- Action button -->
+            <div class="rec-actions">
+              <button id="btnAcceptRec" class="btn btn-success" onclick="acceptRecommendation()">
+                Accept Recommendation
+              </button>
+            </div>
           </div>
         </div>
         <pre class="json-only" id="llmJSON">null</pre>

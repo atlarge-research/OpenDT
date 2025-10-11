@@ -16,10 +16,35 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+from flask import request
+
+@app.route('/api/set_slo', methods=['POST'])
+def set_slo():
+    try:
+        data = request.get_json()
+        energy_target = float(data.get('energy_target'))
+        runtime_target = float(data.get('runtime_target'))
+        
+        # Validate inputs
+        if energy_target <= 0 or runtime_target <= 0:
+            return jsonify({'error': 'Invalid target values'}), 400
+            
+        # Store SLO targets in orchestrator
+        orchestrator.slo_targets['energy_target'] = energy_target
+        orchestrator.slo_targets['runtime_target'] = runtime_target
+        
+        return jsonify({
+            'status': 'success',
+            'energy_target': energy_target,
+            'runtime_target': runtime_target
+        })
+    except (ValueError, TypeError, KeyError) as e:
+        return jsonify({'error': str(e)}), 400
+
 # --- tuning knobs for the improvement loop ---
 IMPROVEMENT_DELTA = 0.05  # minimum score improvement to accept a topology
 WINDOW_TRY_BUDGET_SEC = 30.0  # hard time budget per data window
-MAX_TRIES_PER_WINDOW = 8  # cap to avoid runaway trials even if simulations are super fast
+MAX_TRIES_PER_WINDOW = 1  # cap to avoid runaway trials even if simulations are super fast
 NO_IMPROVEMENT_STOP_AFTER = 3  # stop early if we see this many consecutive non-better proposals
 
 
@@ -27,10 +52,15 @@ class OpenDTOrchestrator:
     def __init__(self):
         self.kafka_servers = os.environ.get('KAFKA_BOOTSTRAP_SERVERS', 'kafka:29092')
         self.openai_key = os.environ.get('OPENAI_API_KEY')
+        self.slo_targets = {
+            'energy_target': 10.0,  
+            'runtime_target': 2
+        }
 
         self.state = {
             'status': 'stopped',
             'cycle_count': 0,
+            'cycle_count_opt': 0,
             'last_simulation': None,
             'last_optimization': None,
             'total_tasks': 0,
@@ -201,9 +231,24 @@ class OpenDTOrchestrator:
             logger.error(f"Producer error: {e}")
 
     def _score(self, sim_results: dict) -> float:
-        energy = sim_results.get('energy_kwh', 5.0) or 0.0
-        runtime = sim_results.get('runtime_hours', 1.0) or 0.0
-        return (2.0 * float(energy)) + (1.0 * float(runtime))
+        # energy = sim_results.get('energy_kwh', 5.0) or 0.0
+        # runtime = sim_results.get('runtime_hours', 1.0) or 0.0
+        # return (2.0 * float(energy)) + (1.0 * float(runtime))
+
+        energy = sim_results.get('energy_kwh', 0.0) or 0.0
+        runtime = sim_results.get('runtime_hours', 0.0) or 0.0
+        
+        energy_target = self.slo_targets.get('energy_target', 10.0)
+        runtime_target = self.slo_targets.get('runtime_target', 2.0)
+        
+        energy_score = min(100, max(0, (energy - energy_target) / energy_target * 100))
+        runtime_score = min(100, max(0, (runtime - runtime_target) / runtime_target * 100))
+
+        ENERGY_WEIGHT = 0.6
+        RUNTIME_WEIGHT = 0.4
+
+        final_score = (energy_score * ENERGY_WEIGHT) + (runtime_score * RUNTIME_WEIGHT)
+        return round(100-final_score, 2)
 
     def run_consumer(self):
         """Per window: run baseline → time-bounded proposal loop → commit only if better."""
@@ -244,8 +289,8 @@ class OpenDTOrchestrator:
                         and not self.stop_event.is_set()
                 ):
                     tries += 1
-                    opt = self.optimizer.optimize(baseline, batch_data, current_topology=best_topology)
-                    self.state['last_optimization'] = opt
+                    opt = self.optimizer.optimize(baseline, batch_data,self.slo_targets, current_topology=best_topology)
+                    
 
                     proposed = opt.get('new_topology')
                     if not proposed:
@@ -260,6 +305,14 @@ class OpenDTOrchestrator:
                         fragments_data=batch_data.get('fragments_sample', []),
                         topology_data=proposed
                     )
+
+                    self.state['last_optimization'] = opt
+                    self.state['last_optimization']['energy_kwh'] = probe.get('energy_kwh', None)
+                    self.state['last_optimization']['runtime_hours'] = probe.get('runtime_hours', None)
+                    self.state['last_optimization']['cpu_utilization'] = probe.get('cpu_utilization',None)
+                    self.state['last_optimization']['max_power_draw'] = probe.get('max_power_draw', None)
+                    
+                    self.state['cycle_count_opt'] += 1
                     score = self._score(probe)
                     if score < best_score - IMPROVEMENT_DELTA:
                         best_topology, best_score = proposed, score
@@ -268,13 +321,13 @@ class OpenDTOrchestrator:
                     self.state['window_trials'] = tries
 
                 # 3) apply only if better than baseline
-                if best_score < baseline_score - IMPROVEMENT_DELTA and best_topology:
-                    if self.update_topology_file(best_topology):
-                        self.state['window_accepted'] = True
-                        self.state['best_config'] = {'config': best_topology, 'score': round(best_score, 3)}
-                        logger.info(f"✅ Applied improved topology: {best_score:.3f} < {baseline_score:.3f}")
-                else:
-                    logger.info(f"📎 No commit (best {best_score:.3f} vs baseline {baseline_score:.3f})")
+                # if best_score < baseline_score - IMPROVEMENT_DELTA and best_topology:
+                    # if self.update_topology_file(best_topology):
+                        # self.state['window_accepted'] = True
+                    self.state['best_config'] = {'config': best_topology, 'score': round(best_score, 3)}
+                    # logger.info(f"✅ Applied improved topology: {best_score:.3f} < {baseline_score:.3f}")
+                # else:
+                #     logger.info(f"📎 No commit (best {best_score:.3f} vs baseline {baseline_score:.3f})")
 
                 # don’t block the next window tick
                 if self.stop_event.wait(0.1):
@@ -351,6 +404,35 @@ def api_reset_topology():
         return jsonify({'message': 'Topology reset to initial configuration'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/accept_recommendation', methods=['POST'])
+def api_accept_recommendation():
+    try:
+        # Get the latest recommendation from state
+        last_opt = orchestrator.state.get('last_optimization', {})
+        proposed_topology = last_opt.get('new_topology')
+        
+        if not proposed_topology:
+            return jsonify({'error': 'No pending recommendation to accept'}), 400
+            
+        # Apply the topology update
+        if orchestrator.update_topology_file(proposed_topology):
+            # Update best config if score is available
+            
+            orchestrator.state['window_accepted'] = True
+            return jsonify({
+                'status': 'success',
+                'message': 'Recommendation accepted and topology updated'
+            })
+        else:
+            return jsonify({'error': 'Failed to update topology'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error accepting recommendation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 
 
 if __name__ == '__main__':

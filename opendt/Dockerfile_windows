@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget unzip \
  && rm -rf /var/lib/apt/lists/*
 
-# Derive JAVA_HOME from the installed 'java', and provide stable symlinks
+# Derive JAVA_HOME from the installed 'java', provide stable symlinks, and ensure compatibility with scripts expecting the legacy path
 RUN set -eux; \
     JH="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"; \
     mkdir -p /usr/lib/jvm; \
@@ -28,14 +28,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # App code
 COPY . .
 
-# Best-effort: if baked in, set runner executable
+# Best-effort: if the OpenDC runner binary is present in the image, make it executable.
+# This avoids build failures when the binary isn't included (e.g., when downloaded at runtime).
 RUN if [ -f /app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner ]; then \
       chmod +x /app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner; \
     fi
 
 # Entrypoint ensures runtime perms and JAVA_HOME PATH before launching
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh && sed -i 's/\r$//' ./entrypoint.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "src/main.py"]
+
+
+ENTRYPOINT ["./entrypoint.sh"]
+#CMD ["python", "src/main.py"]
