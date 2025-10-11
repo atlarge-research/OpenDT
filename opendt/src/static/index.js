@@ -195,3 +195,70 @@ async function poll(){
 setMode(localStorage.getItem(modeKey) || 'ui');
 poll();
 setInterval(poll, 2000);
+
+// ---- SLO submit handler -------------------------------------------------
+async function submitSLO() {
+  const btn = document.getElementById('submit_slo');
+  if (!btn) return;
+
+  try {
+    const energy = parseFloat(document.getElementById('energy_input').value);
+    const runtime = parseFloat(document.getElementById('runtime_input').value);
+    
+    // Validate inputs
+    if (isNaN(energy) || isNaN(runtime)) {
+      console.error('Invalid input values');
+      btn.classList.add('btn-danger');
+      setTimeout(() => {
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-primary');
+      }, 1000);
+      return;
+    }
+
+    // Disable button and store class
+    btn.disabled = true;
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-ghost');
+
+    const response = await fetch('/api/set_slo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        energy_target: energy,
+        runtime_target: runtime
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Update pill sigils
+    const energySigil = document.querySelector('#energy_input').closest('.pill-input').querySelector('.pill-sigil');
+    const runtimeSigil = document.querySelector('#runtime_input').closest('.pill-input').querySelector('.pill-sigil');
+    if (energySigil) energySigil.textContent = fmt(energy, 2);
+    if (runtimeSigil) runtimeSigil.textContent = fmt(runtime, 1);
+
+    // Success feedback
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-success');
+    setTimeout(() => {
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-primary');
+    }, 1000);
+
+  } catch (error) {
+    console.error('Failed to submit SLO:', error);
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-danger');
+    setTimeout(() => {
+      btn.classList.remove('btn-danger');
+      btn.classList.add('btn-primary');
+    }, 1000);
+  } finally {
+    btn.disabled = false;
+  }
+}

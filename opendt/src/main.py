@@ -16,6 +16,31 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+from flask import request
+
+@app.route('/api/set_slo', methods=['POST'])
+def set_slo():
+    try:
+        data = request.get_json()
+        energy_target = float(data.get('energy_target'))
+        runtime_target = float(data.get('runtime_target'))
+        
+        # Validate inputs
+        if energy_target <= 0 or runtime_target <= 0:
+            return jsonify({'error': 'Invalid target values'}), 400
+            
+        # Store SLO targets in orchestrator
+        orchestrator.slo_targets['energy_target'] = energy_target
+        orchestrator.slo_targets['runtime_target'] = runtime_target
+        
+        return jsonify({
+            'status': 'success',
+            'energy_target': energy_target,
+            'runtime_target': runtime_target
+        })
+    except (ValueError, TypeError, KeyError) as e:
+        return jsonify({'error': str(e)}), 400
+
 # --- tuning knobs for the improvement loop ---
 IMPROVEMENT_DELTA = 0.05  # minimum score improvement to accept a topology
 WINDOW_TRY_BUDGET_SEC = 30.0  # hard time budget per data window
@@ -27,6 +52,10 @@ class OpenDTOrchestrator:
     def __init__(self):
         self.kafka_servers = os.environ.get('KAFKA_BOOTSTRAP_SERVERS', 'kafka:29092')
         self.openai_key = os.environ.get('OPENAI_API_KEY')
+        self.slo_targets = {
+            'energy_target': 10.0,  
+            'runtime_target': 2
+        }
 
         self.state = {
             'status': 'stopped',
@@ -202,9 +231,24 @@ class OpenDTOrchestrator:
             logger.error(f"Producer error: {e}")
 
     def _score(self, sim_results: dict) -> float:
-        energy = sim_results.get('energy_kwh', 5.0) or 0.0
-        runtime = sim_results.get('runtime_hours', 1.0) or 0.0
-        return (2.0 * float(energy)) + (1.0 * float(runtime))
+        # energy = sim_results.get('energy_kwh', 5.0) or 0.0
+        # runtime = sim_results.get('runtime_hours', 1.0) or 0.0
+        # return (2.0 * float(energy)) + (1.0 * float(runtime))
+
+        energy = sim_results.get('energy_kwh', 0.0) or 0.0
+        runtime = sim_results.get('runtime_hours', 0.0) or 0.0
+        
+        energy_target = self.slo_targets.get('energy_target', 10.0)
+        runtime_target = self.slo_targets.get('runtime_target', 2.0)
+        
+        energy_score = min(100, max(0, (energy - energy_target) / energy_target * 100))
+        runtime_score = min(100, max(0, (runtime - runtime_target) / runtime_target * 100))
+
+        ENERGY_WEIGHT = 0.6
+        RUNTIME_WEIGHT = 0.4
+
+        final_score = (energy_score * ENERGY_WEIGHT) + (runtime_score * RUNTIME_WEIGHT)
+        return round(100-final_score, 2)
 
     def run_consumer(self):
         """Per window: run baseline → time-bounded proposal loop → commit only if better."""
@@ -245,7 +289,7 @@ class OpenDTOrchestrator:
                         and not self.stop_event.is_set()
                 ):
                     tries += 1
-                    opt = self.optimizer.optimize(baseline, batch_data, current_topology=best_topology)
+                    opt = self.optimizer.optimize(baseline, batch_data,self.slo_targets, current_topology=best_topology)
                     
 
                     proposed = opt.get('new_topology')
@@ -277,13 +321,13 @@ class OpenDTOrchestrator:
                     self.state['window_trials'] = tries
 
                 # 3) apply only if better than baseline
-                if best_score < baseline_score - IMPROVEMENT_DELTA and best_topology:
+                # if best_score < baseline_score - IMPROVEMENT_DELTA and best_topology:
                     # if self.update_topology_file(best_topology):
                         # self.state['window_accepted'] = True
                     self.state['best_config'] = {'config': best_topology, 'score': round(best_score, 3)}
                     # logger.info(f"✅ Applied improved topology: {best_score:.3f} < {baseline_score:.3f}")
-                else:
-                    logger.info(f"📎 No commit (best {best_score:.3f} vs baseline {baseline_score:.3f})")
+                # else:
+                #     logger.info(f"📎 No commit (best {best_score:.3f} vs baseline {baseline_score:.3f})")
 
                 # don’t block the next window tick
                 if self.stop_event.wait(0.1):
@@ -393,4 +437,4 @@ def api_accept_recommendation():
 
 if __name__ == '__main__':
     # NOTE: ensure index.html is under ./templates/index.html
-    app.run(host='0.0.0.0', port=8081, debug=True, threaded=True)
+    app.run(host='0.0.0.0', port=8080, debug=False, threaded=True)

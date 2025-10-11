@@ -104,8 +104,45 @@
             <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
             <div><span>Runtime (h)</span><strong id="kvRuntime">—</strong></div>
             <div><span>Max Power (W)</span><strong id="kvMaxPower">—</strong></div>
-            <div><span>optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
+            <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div> 
+            
           </div>
+          
+
+          <div class="kv">  
+            <div class="input-group">
+              <span>Energy</span>
+              <div class="pill-input">
+                <input type="number" 
+                      id="energy_input" 
+                      class="pill-field" 
+                      placeholder="10"
+                      min="0" 
+                      step="1">
+              </div>
+            </div>
+          
+            <div class="input-group">
+              <span>Runtime</span>
+              <div class="pill-input">
+                <input type="number" 
+                      id="runtime_input" 
+                      class="pill-field" 
+                      placeholder="2"
+                      min="0" 
+                      step="1">
+              </div>
+
+              
+            </div>
+            <div class="rec-actions">
+                <button id="submit_slo" class="btn btn-primary" onclick="submitSLO()">
+                  Submit
+                </button>
+            </div>
+            
+          </div>
+
         </div>
         <pre class="json-only" id="simJSON">null</pre>
       </div>

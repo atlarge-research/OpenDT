@@ -13,6 +13,17 @@
           "memory": {
             "memorySize": 34359738368
           }
+        },
+        {
+          "name": "H02",
+          "count": 3,
+          "cpu": {
+            "coreCount": 16,
+            "coreSpeed": 2100
+          },
+          "memory": {
+            "memorySize": 34359738368
+          }
         }
       ]
     }

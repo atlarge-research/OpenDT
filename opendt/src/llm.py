@@ -40,26 +40,26 @@ class LLM:
             return True
         return False
 
-    def optimize(self, simulation_results, batch_data, current_topology=None):
+    def optimize(self, simulation_results, batch_data, slo_targets, current_topology=None):
         """Optimize topology based on simulation results"""
 
         if not self.has_llm:
-            return self.rule_based_optimization(simulation_results, batch_data, current_topology,
+            return self.rule_based_optimization(simulation_results, batch_data, current_topology, slo_targets,
                                                 reason="No OpenAI API key")
 
         try:
-            return self.llm_optimization(simulation_results, batch_data, current_topology)
+            return self.llm_optimization(simulation_results, batch_data, slo_targets,current_topology )
         except Exception as e:
             logger.error(f"LLM optimization failed: {e}")
-            return self.rule_based_optimization(simulation_results, batch_data, current_topology,
+            return self.rule_based_optimization(simulation_results, batch_data, current_topology, slo_targets,
                                                 reason=f"LLM Error: {str(e)}")
 
-    def rule_based_optimization(self, sim_results, batch_data, current_topology=None, reason=""):
+    def rule_based_optimization(self, sim_results, batch_data, slo_targets, current_topology=None, reason=""):
         """Simple rule-based optimization with topology updates"""
         energy = sim_results.get('energy_kwh', 2.0)
 
         # TODO: instead of CPU_utilization, find out the total time elapsed in running the tasks
-        cpu_util = sim_results.get('cpu_utilization', 0.5)
+        runtime_hours = sim_results.get('runtime_hours', 2)
         task_count = batch_data.get('task_count', 10)
 
         recommendations = []
@@ -79,7 +79,7 @@ class LLM:
             # TODO: else it's good, show green.
 
             # TODO: do this for energy and performance at the same time. e.g., if at least one of them is bad, then it's bad.
-            if energy > 10.0:
+            if energy > slo.get('energy_target', 10.0) * 1.15:
                 recommendations.append("🔥 CRITICAL: Reduce host count - very high energy consumption")
                 action = "massive downscale"
                 # Reduce host count if possible
@@ -87,7 +87,7 @@ class LLM:
                     for host in cluster.get('hosts', []):
                         if host.get('count', 1) > 1:
                             host['count'] = max(1, host['count'] - 1)
-            elif energy > 5.0:
+            elif energy > slo.get('energy_target', 10.0):
                 recommendations.append("⚠️ HIGH: Consider reducing core speed - high energy usage")
                 action = "downscale"
                 # Reduce core speed
@@ -96,7 +96,7 @@ class LLM:
                         current_speed = host.get('cpu', {}).get('coreSpeed', 2400)
                         if current_speed > 2000:
                             host['cpu']['coreSpeed'] = max(2000, int(current_speed * 0.9))
-            elif cpu_util > 0.8:
+            elif runtime_hours > slo.get('runtime_target', 2) * 1.15:
                 recommendations.append("📈 SCALE UP: Add CPU cores - high utilization")
                 action = "upscale"
                 # Increase core count
@@ -105,7 +105,7 @@ class LLM:
                         current_cores = host.get('cpu', {}).get('coreCount', 16)
                         if current_cores < 32:
                             host['cpu']['coreCount'] = min(32, current_cores + 4)
-            elif cpu_util < 0.3:
+            elif runtime_hours > slo.get('runtime_target', 2):
                 recommendations.append("📉 CONSOLIDATE: Reduce cores - low utilization")
                 action = "slightly downscale"
                 # Reduce core count
@@ -132,7 +132,7 @@ class LLM:
             'best_score': self.best_score if self.best_config else None
         }
 
-    def llm_optimization(self, sim_results, batch_data, current_topology=None):
+    def llm_optimization(self, sim_results, batch_data, slo_targets,current_topology=None):
         """LLM-based optimization with OpenAI and topology updates"""
         try:
             from langchain_openai import ChatOpenAI
@@ -161,36 +161,39 @@ class LLM:
             parser = JsonOutputParser(pydantic_object=TopologyRecommendation)
 
             prompt = f"""You are an expert datacenter practitioner. 
-Based on these simulation results, provide specific recommendations to optimize energy utilization and performance (execution time).
+                        Based on these simulation results, provide specific recommendations to optimize energy utilization and performance (execution time).
 
-You will be provided data from OpenDC simulator which simulates datacenter energy usage and runtime.
-You need to recommend next core count and core speed for simulation for each cluster and host.
+                        You will be provided data from OpenDC simulator which simulates datacenter energy usage and runtime.
+                        You need to recommend next core count and core speed for simulation for each cluster and host.
 
-You need to recommend similar configuration which helps to achieve objectives:
-- Lesser runtime
-- Less energy consumption
+                        You need to recommend similar configuration which helps to achieve objectives:
+                        - Lesser runtime
+                        - Less energy consumption
 
-SIMULATION RESULTS:
-- Energy Usage: {sim_results.get('energy_kwh', 'N/A')} kWh
-- Runtime: {sim_results.get('runtime_hours', 'N/A')} hours
-- CPU Utilization: {sim_results.get('cpu_utilization', 'N/A')}
-- Task Count: {batch_data.get('task_count', 'N/A')}  
-- Fragment Count: {batch_data.get('fragment_count', 'N/A')}
-- Average CPU Usage: {batch_data.get('avg_cpu_usage', 'N/A')}
+                        Try to achieve both objectives(SLOs) at the same time as much as possible:
+                        {slo_targets}
 
-Current topology: {json.dumps(current_topology, indent=2) if current_topology else 'Not provided'}
+                        SIMULATION RESULTS:
+                        - Energy Usage: {sim_results.get('energy_kwh', 'N/A')} kWh
+                        - Runtime: {sim_results.get('runtime_hours', 'N/A')} hours
+                        - CPU Utilization: {sim_results.get('cpu_utilization', 'N/A')}
+                        - Task Count: {batch_data.get('task_count', 'N/A')}  
+                        - Fragment Count: {batch_data.get('fragment_count', 'N/A')}
+                        - Average CPU Usage: {batch_data.get('avg_cpu_usage', 'N/A')}
 
-{parser.get_format_instructions()}
+                        Current topology: {json.dumps(current_topology, indent=2) if current_topology else 'Not provided'}
 
-Example:
-{{
-  "cluster_name": ["C01", "C01"],
-  "host_name": ["H01", "H02"],
-  "coreCount": [32, 16],
-  "coreSpeed": [3200, 2100],
-  "count": [2, 3]
-}}
-"""
+                        {parser.get_format_instructions()}
+
+                        Example:
+                        {{
+                        "cluster_name": ["C01", "C01"],
+                        "host_name": ["H01", "H02"],
+                        "coreCount": [32, 16],
+                        "coreSpeed": [3200, 2100],
+                        "count": [2, 3]
+                        }}
+                        """
 
             logger.info("🤖 Calling OpenAI for topology optimization...")
             response = llm.invoke(prompt)
@@ -235,15 +238,15 @@ Example:
 
             except Exception as e:
                 logger.error(f"LLM response parsing failed: {e}")
-                return self.rule_based_optimization(sim_results, batch_data, current_topology,
+                return self.rule_based_optimization(sim_results, batch_data, current_topology, slo_targets,
                                                     reason=f"LLM parsing error: {str(e)}")
 
         except ImportError:
-            return self.rule_based_optimization(sim_results, batch_data, current_topology,
+            return self.rule_based_optimization(sim_results, batch_data, current_topology,slo_targets,
                                                 reason="langchain-openai not installed")
         except Exception as e:  
             logger.error(f"LLM call failed: {e}")
-            return self.rule_based_optimization(sim_results, batch_data, current_topology,
+            return self.rule_based_optimization(sim_results, batch_data, current_topology,slo_targets,
                                                 reason=f"LLM API Error: {str(e)}")
 
     def convert_llm_to_topology(self, llm_result, current_topology):
