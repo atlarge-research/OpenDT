@@ -330,6 +330,7 @@ function resizePlots() {
 }
 window.addEventListener('resize', debounce(resizePlots, 120));
 
+
 // ===== Real-time charts via SSE =====
 async function fetchTS() {
   const r = await fetch('/api/sim/timeseries', { cache: 'no-store' });
@@ -341,59 +342,66 @@ async function drawReal() {
   const d = await fetchTS();
   if (d.status !== 'ok') return;
 
-  if (d.host) {
-  const traces = [
-    { x: d.host.x, y: d.host.cpu_utilization, mode: 'lines',
-      name: 'Real CPU (%)', line: { color: COLORS.real, width: 2 } }
-  ];
-  if (d.host_sim) {
-    traces.push({
-      x: d.host_sim.x, y: d.host_sim.cpu_utilization, mode: 'lines',
-      name: 'Sim CPU (%)', line: { color: COLORS.sim, width: 2, dash: 'dash' }
-    });
+  // --- CPU (Real vs Sim)
+  if (d.host || d.host_sim) {
+    const traces = [];
+    if (d.host) {
+      traces.push({
+        x: d.host.x, y: d.host.cpu_utilization, mode: 'lines',
+        name: 'Real CPU (%)', line: { color: COLORS.real, width: 2 }
+      });
+    }
+    if (d.host_sim) {
+      traces.push({
+        x: d.host_sim.x, y: d.host_sim.cpu_utilization, mode: 'lines',
+        name: 'Sim CPU (%)', line: { color: COLORS.sim, width: 2, dash: 'dash' }
+      });
+    }
+    Plotly.react('chart-cpu', traces, layoutFor('CPU Utilization — Real vs Sim'), PLOTLY_CONFIG);
   }
-  Plotly.react('chart-cpu', traces, layoutFor('CPU Utilization — Real vs Sim'), PLOTLY_CONFIG);
-}
 
-if (d.power) {
-  const traces = [
-    { x: d.power.x, y: d.power.power_draw, mode: 'lines',
-      name: 'Real Power (kW)', line: { color: COLORS.real, width: 2 } }
-  ];
-  if (d.power_sim) {
-    traces.push({
-      x: d.power_sim.x, y: d.power_sim.power_draw, mode: 'lines',
-      name: 'Sim Power (kW)', line: { color: COLORS.sim, width: 2, dash: 'dash' }
-    });
+  // --- Power (Real vs Sim) — show kW
+  if (d.power || d.power_sim) {
+    const pTraces = [];
+    if (d.power) {
+      pTraces.push({
+        x: d.power.x, y: (d.power.power_draw || []).map(v => v == null ? null : v / 1000),
+        mode: 'lines', name: 'Real Power (kW)', line: { color: COLORS.real, width: 2 }
+      });
+    }
+    if (d.power_sim) {
+      pTraces.push({
+        x: d.power_sim.x, y: (d.power_sim.power_draw || []).map(v => v == null ? null : v / 1000),
+        mode: 'lines', name: 'Sim Power (kW)', line: { color: COLORS.sim, width: 2, dash: 'dash' }
+      });
+    }
+    Plotly.react('chart-power', pTraces, layoutFor('Power — Real vs Sim (5-min avg)'), PLOTLY_CONFIG);
   }
-  Plotly.react('chart-power', traces, layoutFor('Power — Real vs Sim (5-min avg)'), PLOTLY_CONFIG);
 
-  const eTraces = [
-    { x: d.power.x, y: d.power.energy_kwh_cum, mode: 'lines',
-      name: 'Real Cumulative (kWh)', line: { color: COLORS.real, width: 2 } }
-  ];
-  if (d.power_sim) {
-    eTraces.push({
-      x: d.power_sim.x, y: d.power_sim.energy_kwh_cum, mode: 'lines',
-      name: 'Sim Cumulative (kWh)', line: { color: COLORS.sim, width: 2, dash: 'dash' }
-    });
+  // --- Cumulative Energy (kWh) — only if present
+  if ((d.power && Array.isArray(d.power.energy_kwh_cum)) ||
+      (d.power_sim && Array.isArray(d.power_sim.energy_kwh_cum))) {
+    const eTraces = [];
+    if (d.power && d.power.energy_kwh_cum) {
+      eTraces.push({
+        x: d.power.x, y: d.power.energy_kwh_cum, mode: 'lines',
+        name: 'Real Cumulative (kWh)', line: { color: COLORS.real, width: 2 }
+      });
+    }
+    if (d.power_sim && d.power_sim.energy_kwh_cum) {
+      eTraces.push({
+        x: d.power_sim.x, y: d.power_sim.energy_kwh_cum, mode: 'lines',
+        name: 'Sim Cumulative (kWh)', line: { color: COLORS.sim, width: 2, dash: 'dash' }
+      });
+    }
+    Plotly.react('chart-energy', eTraces, layoutFor('Cumulative Energy — Real vs Sim'), PLOTLY_CONFIG);
   }
-  Plotly.react('chart-energy', eTraces, layoutFor('Cumulative Energy — Real vs Sim'), PLOTLY_CONFIG);
-}
-
 }
 
 // ---- boot the charts ----
 document.addEventListener('DOMContentLoaded', () => {
-  // draw mock immediately so the page isn’t empty
   try { plotMockCharts(); } catch(_) {}
-
-  // draw real data once, then keep it refreshed
   try { drawReal(); } catch(_) {}
-
-  // start file-change events if the server provides SSE
   try { startSse(); } catch(_) {}
-
-  // safety refresh every few seconds (optional)
   setInterval(() => { try { drawReal(); } catch(_) {} }, 5000);
 });

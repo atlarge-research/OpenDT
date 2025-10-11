@@ -458,7 +458,7 @@ def _start_watcher_once():
         # also watch SIM_DIR if set and different
         if SIM_DIR and os.path.abspath(SIM_DIR) != os.path.abspath(REAL_DIR):
             os.makedirs(SIM_DIR, exist_ok=True)
-            observer.schedule(handler, SIM_DIR, recursive=False)
+            observer.schedule(handler, SIM_DIR, recursive=True)
         observer.daemon = True
         observer.start()
         _watch_started = True
@@ -496,61 +496,124 @@ def sse_files():
     }
     return Response(gen(), headers=headers)
 
+
+# ===== real+sim parquet timeseries (TOP-LEVEL, only once) =====
+import os, json, glob
+from pathlib import Path
+import pandas as pd
+from flask import jsonify
+
+DATA_DIR = os.environ.get("OPENDT_DATA_DIR", "/app/data")
+SIM_DIR  = os.environ.get("OPENDT_SIM_DIR", None)
+
+def _latest_recursive(patterns, base_dir):
+    if not base_dir or not os.path.isdir(base_dir):
+        return None
+    files = []
+    for pat in patterns:
+        files.extend(glob.glob(os.path.join(base_dir, "**", pat), recursive=True))
+    return max(files, key=os.path.getmtime) if files else None
+
+def _read_any(path: str) -> pd.DataFrame:
+    if not path or not os.path.exists(path):
+        return pd.DataFrame()
+    ext = Path(path).suffix.lower()
+    try:
+        if ext == ".parquet": return pd.read_parquet(path)
+        if ext == ".csv":     return pd.read_csv(path)
+        if ext == ".jsonl":
+            rows = []
+            with open(path, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    try: rows.append(json.loads(line))
+                    except: pass
+            return pd.DataFrame(rows)
+        if ext == ".json":
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            return pd.DataFrame(data if isinstance(data, list) else data.get("rows", []))
+    except Exception:
+        return pd.DataFrame()
+    return pd.DataFrame()
+
+def _build_from(base_dir):
+    out = {"_dir": base_dir, "files": {"power": None, "host": None}}
+    if not base_dir:
+        return out
+
+    p = _latest_recursive(
+        ["*powerSource*.parquet", "*powerSource*.csv", "*powerSource*.jsonl", "*powerSource*.json"],
+        base_dir
+    )
+    h = _latest_recursive(
+        ["*host*.parquet", "*host*.csv", "*host*.jsonl", "*host*.json"],
+        base_dir
+    )
+    if p: out["files"]["power"] = os.path.relpath(p, base_dir)
+    if h: out["files"]["host"]  = os.path.relpath(h, base_dir)
+
+    pdf = _read_any(p); hdf = _read_any(h)
+
+    if not pdf.empty:
+        x = pd.to_datetime(pdf.get("timestamp", pd.RangeIndex(len(pdf))), errors="coerce").astype(str).tolist()
+        power_draw = pdf["power_draw"].tolist() if "power_draw" in pdf.columns else [None]*len(x)
+        energy_kwh_cum = (pdf["energy_usage"].fillna(0)/3_600_000.0).cumsum().round(6).tolist() if "energy_usage" in pdf.columns else []
+        out["power"] = {"x": x, "power_draw": power_draw, "energy_kwh_cum": energy_kwh_cum}
+
+    if not hdf.empty:
+        hx = pd.to_datetime(hdf.get("timestamp", pd.RangeIndex(len(hdf))), errors="coerce").astype(str).tolist()
+        cpu = hdf["cpu_utilization"].tolist() if "cpu_utilization" in hdf.columns else [None]*len(hx)
+        out["host"] = {"x": hx, "cpu_utilization": cpu}
+
+    return out
+
 @app.route("/api/sim/timeseries")
 def api_sim_timeseries():
-    """Ultra-robust CSV-only reader to stop 500s."""
-    import os, json, pandas as pd
-    from flask import jsonify
+    real = _build_from(DATA_DIR)
+    sim  = _build_from(SIM_DIR) if SIM_DIR else {}
 
-    DATA_DIR = os.environ.get("OPENDT_DATA_DIR", "/app/data")
-    p_csv = os.path.join(DATA_DIR, "powerSource.csv")
-    h_csv = os.path.join(DATA_DIR, "host.csv")
-
-    try:
-        pdf = pd.read_csv(p_csv)
-        hdf = pd.read_csv(h_csv)
-    except Exception as e:
-        # Show the error message instead of 500 so you can see what's wrong
+    # Was: if ("power" not in real) and ("host" not in real): return empty
+    # FIX: only return empty if BOTH real AND sim have no series.
+    real_has = ("power" in real) or ("host" in real)
+    sim_has  = ("power" in sim)  or ("host" in sim)
+    if not real_has and not sim_has:
         return jsonify({
-            "status": "error",
-            "message": f"CSV read failed: {e}",
-            "paths": {"power": p_csv, "host": h_csv}
-        }), 200
+            "status": "empty",
+            "source_files": {
+                "real": real.get("files", {}),
+                "sim":  sim.get("files",  {}) if sim else {}
+            },
+            "mtime": 0
+        })
 
-    # Power series
-    if "timestamp" in pdf.columns:
-        px = pd.to_datetime(pdf["timestamp"], errors="coerce").astype(str).tolist()
-    else:
-        px = list(range(len(pdf)))
-    power_draw = pdf["power_draw"].tolist() if "power_draw" in pdf.columns else [None] * len(px)
-    energy_kwh_cum = []
-    if "energy_usage" in pdf.columns:
-        energy_kwh_cum = (pdf["energy_usage"].fillna(0) / 3_600_000.0).cumsum().round(6).tolist()
-
-    # Host series
-    if "timestamp" in hdf.columns:
-        hx = pd.to_datetime(hdf["timestamp"], errors="coerce").astype(str).tolist()
-    else:
-        hx = list(range(len(hdf)))
-    cpu = hdf["cpu_utilization"].tolist() if "cpu_utilization" in hdf.columns else [None] * len(hx)
-
-    # Build payload
-    import time
-    mt = 0
-    try:
-        mt = int(max(os.path.getmtime(p_csv), os.path.getmtime(h_csv)))
-    except Exception:
-        pass
+    # newest mtime across any used file (real or sim)
+    mtimes = []
+    for group in (g for g in (real, sim) if g):  # iterate real & sim
+        for rel in (group.get("files") or {}).values():
+            if not rel:
+                continue
+            p = os.path.join(group.get("_dir", ""), rel)
+            if os.path.exists(p):
+                mtimes.append(os.path.getmtime(p))
 
     payload = {
         "status": "ok",
-        "source_files": {"power": "powerSource.csv", "host": "host.csv"},
-        "power": {"x": px, "power_draw": power_draw, "energy_kwh_cum": energy_kwh_cum},
-        "host": {"x": hx, "cpu_utilization": cpu},
-        "mtime": mt,
+        "source_files": {
+            "real": real.get("files", {}),
+            **({"sim": sim.get("files", {})} if sim else {})
+        },
+        # include REAL if present
+        **({"power": real.get("power")} if "power" in real else {}),
+        **({"host":  real.get("host")}  if "host"  in real else {}),
+        # include SIM if present
+        **({"power_sim": sim.get("power")} if "power" in sim else {}),
+        **({"host_sim":  sim.get("host")}  if "host"  in sim else {}),
+        "mtime": int(max(mtimes)) if mtimes else 0,
     }
-    payload = json.loads(json.dumps(payload, default=str))
-    return jsonify(payload)
+    return jsonify(json.loads(json.dumps(payload, default=str)))
+# ===== end =====
+
+
 
 
 if __name__ == '__main__':

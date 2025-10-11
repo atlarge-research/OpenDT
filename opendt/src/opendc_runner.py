@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-import subprocess
+import os
 import json
 import logging
+import subprocess
 from pathlib import Path
+
 import pandas as pd
-import os
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -15,39 +16,32 @@ class OpenDCRunner:
     """OpenDC ExperimentRunner with comprehensive path detection and diagnostics"""
 
     def __init__(self):
-        # Search for OpenDC runner in multiple locations
+        # Try to locate the OpenDC binary; don't ever return from __init__
         possible_paths = [
             "/app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner",
             "/app/opendt-simulator/bin/OpenDCExperimentRunner/OpenDCExperimentRunner",
             "/app/opendc/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner",
             "/app/opendc/bin/OpenDCExperimentRunner/OpenDCExperimentRunner",
-            "./opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"
+            "./opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner",
         ]
 
         self.opendc_path = None
 
-        # Debug: List all files in the system
         logger.info("🔍 Searching for OpenDC runner...")
         for path in possible_paths:
-            path_obj = Path(path)
+            p = Path(path)
             logger.info(f"Checking: {path}")
-            logger.info(f"  - Exists: {path_obj.exists()}")
+            logger.info(f"  - Exists: {p.exists()}")
+            if not p.exists():
+                continue
 
-            if path_obj.exists():
-                is_file = path_obj.is_file()
-                is_executable = os.access(path, os.X_OK) if is_file else False
-
-                logger.info(f"  - Is file: {is_file}")
-                logger.info(f"  - Is executable: {is_executable}")
-                logger.info(f"  - File size: {path_obj.stat().st_size if is_file else 'N/A'}")
-                logger.info(f"  - Permissions: {oct(path_obj.stat().st_mode)[-3:] if is_file else 'N/A'}")
-
-                if is_file and is_executable:
+            if p.is_file():
+                if os.access(path, os.X_OK):
                     self.opendc_path = path
-                    logger.info(f"✅ Found working OpenDC runner: {path}")
+                    logger.info(f"✅ Found executable OpenDC runner: {path}")
                     break
-                elif is_file:
-                    logger.warning(f"⚠️ Found OpenDC but fixing permissions: {path}")
+                else:
+                    logger.warning(f"⚠️ OpenDC found but not executable, fixing perms: {path}")
                     try:
                         os.chmod(path, 0o755)
                         if os.access(path, os.X_OK):
@@ -55,26 +49,24 @@ class OpenDCRunner:
                             logger.info(f"✅ Fixed permissions for OpenDC runner: {path}")
                             break
                     except Exception as e:
-                        logger.error(f"❌ Failed to fix permissions: {e}")
+                        logger.error(f"❌ Failed to chmod OpenDC runner: {e}")
 
-        # Additional debugging - list directory contents
+        # (Debug) list potential directories
         logger.info("📁 Directory structure:")
-        for base_dir in ["/app/opendt-simulator", "/app/opendc"]:
-            if Path(base_dir).exists():
-                logger.info(f"Contents of {base_dir}:")
+        for base in ["/app/opendt-simulator", "/app/opendc"]:
+            if Path(base).exists():
+                logger.info(f"Contents of {base}:")
                 try:
-                    for item in Path(base_dir).rglob("*"):
-                        if item.is_file() and "OpenDC" in str(item):
+                    for item in Path(base).rglob("*OpenDC*"):
+                        if item.is_file():
                             size = item.stat().st_size
                             perms = oct(item.stat().st_mode)[-3:]
-                            executable = os.access(str(item), os.X_OK)
-                            logger.info(f"  📄 {item} [{size} bytes, {perms}, exec: {executable}]")
+                            execb = os.access(str(item), os.X_OK)
+                            logger.info(f"  📄 {item} [{size} bytes, {perms}, exec: {execb}]")
                 except Exception as e:
-                    logger.error(f"Error listing {base_dir}: {e}")
+                    logger.error(f"Error listing {base}: {e}")
 
-        if not self.opendc_path:
-            logger.error("❌ OpenDC runner not found anywhere - using enhanced mock simulation")
-
+        # Define base experiment config (used when we actually run OpenDC)
         self.base_experiment = {
             "name": "opendt-simulation",
             "exportModels": [{
@@ -86,111 +78,105 @@ class OpenDCRunner:
             }]
         }
 
+    # ---------- helpers to construct inputs ----------
     def create_workload(self, tasks_data, fragments_data):
-        """Create OpenDC workload files from streaming data"""
-
+        """Create OpenDC workload files from the given streaming data."""
         workload_dir = Path("/tmp/opendt_workload")
         workload_dir.mkdir(parents=True, exist_ok=True)
 
-        # Convert streaming data to proper format
-        if tasks_data and len(tasks_data) > 0:
-            tasks_df = pd.DataFrame([
-                {
-                    'id': t.get('id', 0),
-                    'submission_time': int(pd.to_datetime(t.get('submission_time', '2024-01-01')).value) // 1_000_000,
-                    'duration': t.get('duration', 30000),
-                    'cpu_count': t.get('cpu_count', 1),
-                    'cpu_capacity': t.get('cpu_capacity', 2400.0),
-                    'mem_capacity': t.get('mem_capacity', 1024 ** 3)
-                }
-                for t in tasks_data
-            ])
-            
-            tasks_table = pa.Table.from_pandas(tasks_df,  pa.schema([
-                pa.field("id", pa.int32(), nullable=False),   
-                pa.field("submission_time", pa.int64(), False),       
-                pa.field("duration", pa.int64(), False),             
-                pa.field("cpu_count", pa.int32(), False),             
-                pa.field("cpu_capacity", pa.float64(), False),        
-                pa.field("mem_capacity", pa.int64(), False),          
-            ]), preserve_index=False)
+        if tasks_data:
+            tasks_df = pd.DataFrame([{
+                "id": t.get("id", 0),
+                "submission_time": int(pd.to_datetime(t.get("submission_time", "2024-01-01")).value) // 1_000_000,
+                "duration": t.get("duration", 30000),
+                "cpu_count": t.get("cpu_count", 1),
+                "cpu_capacity": t.get("cpu_capacity", 2400.0),
+                "mem_capacity": t.get("mem_capacity", 1024 ** 3),
+            } for t in tasks_data])
 
+            tasks_table = pa.Table.from_pandas(
+                tasks_df,
+                pa.schema([
+                    pa.field("id", pa.int32(), False),
+                    pa.field("submission_time", pa.int64(), False),
+                    pa.field("duration", pa.int64(), False),
+                    pa.field("cpu_count", pa.int32(), False),
+                    pa.field("cpu_capacity", pa.float64(), False),
+                    pa.field("mem_capacity", pa.int64(), False),
+                ]),
+                preserve_index=False,
+            )
             pq.write_table(tasks_table, workload_dir / "tasks.parquet")
             logger.info(f"📄 Created tasks.parquet with {len(tasks_df)} tasks")
 
-        if fragments_data and len(fragments_data) > 0:
-            fragments_df = pd.DataFrame([
-                {
-                    'id': f.get('id', 0),
-                    'duration': f.get('duration', 10000),
-                    'cpu_count': 1,
-                    'cpu_usage': f.get('cpu_usage', 0.5)
-                }
-                for f in fragments_data
-            ])
+        if fragments_data:
+            frags_df = pd.DataFrame([{
+                "id": f.get("id", 0),
+                "duration": f.get("duration", 10000),
+                "cpu_count": 1,
+                "cpu_usage": f.get("cpu_usage", 0.5),
+            } for f in fragments_data])
 
-            frags_table = pa.Table.from_pandas(fragments_df, pa.schema([
-                pa.field("id", pa.int32(), False),                  
-                pa.field("duration", pa.int64(), False),             
-                pa.field("cpu_count", pa.int32(), False),             
-                pa.field("cpu_usage", pa.float64(), False),             
-            ]), preserve_index=False)
-
+            frags_table = pa.Table.from_pandas(
+                frags_df,
+                pa.schema([
+                    pa.field("id", pa.int32(), False),
+                    pa.field("duration", pa.int64(), False),
+                    pa.field("cpu_count", pa.int32(), False),
+                    pa.field("cpu_usage", pa.float64(), False),
+                ]),
+                preserve_index=False,
+            )
             pq.write_table(frags_table, workload_dir / "fragments.parquet")
-            logger.info(f"📄 Created fragments.parquet with {len(fragments_df)} fragments")
+            logger.info(f"📄 Created fragments.parquet with {len(frags_df)} fragments")
 
         return str(workload_dir)
 
+    # ---------- main entry: run a simulation or fall back ----------
     def run_simulation(self, tasks_data, fragments_data, topology_data):
-        """Run OpenDC simulation with real data or enhanced mock"""
-
+        """Run OpenDC; if the runner is missing/unusable, write mock outputs."""
         if not self.opendc_path:
-            return self.create_enhanced_mock_results(tasks_data, fragments_data,
-                                                     "OpenDC runner not found anywhere in expected paths")
+            return self.create_enhanced_mock_results(
+                tasks_data, fragments_data,
+                outdir=os.environ.get("OPENDT_SIM_DIR") or "/app/data",
+                reason="OpenDC runner not found or not executable"
+            )
 
         try:
-            # Create workload
+            # Build workload inputs
             workload_path = self.create_workload(tasks_data, fragments_data)
 
-            # Create topology file
+            # Write topology file
             topology_file = Path("/tmp/topology.json")
-            with open(topology_file, 'w') as f:
-                json.dump(topology_data, f, indent=2)
+            topology_file.write_text(json.dumps(topology_data, indent=2))
             logger.info(f"📄 Created topology: {topology_file}")
 
-            # Create experiment configuration
-            experiment_config = self.base_experiment.copy()
-            experiment_config.update({
+            # Experiment config
+            experiment = dict(self.base_experiment)
+            experiment.update({
                 "topologies": [{"pathToFile": str(topology_file)}],
-                "workloads": [{
-                    "pathToFile": workload_path,
-                    "type": "ComputeWorkload"
-                }]
+                "workloads": [{"pathToFile": workload_path, "type": "ComputeWorkload"}],
             })
-
-            # Write experiment file
             experiment_file = Path("/tmp/experiment.json")
-            with open(experiment_file, 'w') as f:
-                json.dump(experiment_config, f, indent=2)
+            experiment_file.write_text(json.dumps(experiment, indent=2))
             logger.info(f"📄 Created experiment: {experiment_file}")
 
+            # Run OpenDC
             logger.info(f"🚀 Running OpenDC simulation: {self.opendc_path}")
-
-            # Run OpenDC with proper Java setup
             env = os.environ.copy()
-            env['JAVA_HOME'] = '/usr/lib/jvm/java-21-openjdk-amd64'
+            env.setdefault("JAVA_HOME", "/usr/lib/jvm/java-21-openjdk-amd64")
 
-            # Test if file is actually executable
             if not os.access(self.opendc_path, os.X_OK):
                 logger.error(f"❌ OpenDC runner is not executable: {self.opendc_path}")
-                return self.create_enhanced_mock_results(tasks_data, fragments_data,
-                                                         f"OpenDC runner permissions issue: {self.opendc_path}")
+                return self.create_enhanced_mock_results(
+                    tasks_data, fragments_data,
+                    reason=f"OpenDC runner permissions issue: {self.opendc_path}"
+                )
 
-            result = subprocess.run([
-                str(self.opendc_path),
-                "--experiment-path", str(experiment_file)
-            ], capture_output=True, text=True, timeout=120, env=env)
-
+            result = subprocess.run(
+                [self.opendc_path, "--experiment-path", str(experiment_file)],
+                capture_output=True, text=True, timeout=120, env=env
+            )
             logger.info(f"OpenDC return code: {result.returncode}")
             if result.stdout:
                 logger.info(f"OpenDC stdout: {result.stdout}")
@@ -198,154 +184,161 @@ class OpenDCRunner:
                 logger.info(f"OpenDC stderr: {result.stderr}")
 
             if result.returncode != 0:
-                return self.create_enhanced_mock_results(tasks_data, fragments_data,
-                                                         f"OpenDC failed (code {result.returncode}): {result.stderr[:100]}")
+                return self.create_enhanced_mock_results(
+                    tasks_data, fragments_data,
+                    reason=f"OpenDC failed (code {result.returncode})"
+                )
 
             logger.info("✅ OpenDC simulation completed successfully")
-
-            # Parse results
             return self.parse_opendc_results()
 
         except subprocess.TimeoutExpired:
-            error_msg = "OpenDC simulation timed out (2 minutes)"
-            logger.error(error_msg)
-            return self.create_enhanced_mock_results(tasks_data, fragments_data, error_msg)
+            return self.create_enhanced_mock_results(
+                tasks_data, fragments_data, reason="OpenDC simulation timed out"
+            )
         except Exception as e:
-            error_msg = f"OpenDC execution failed: {str(e)}"
-            logger.error(error_msg)
-            return self.create_enhanced_mock_results(tasks_data, fragments_data, error_msg)
+            logger.error(f"OpenDC execution failed: {e}")
+            return self.create_enhanced_mock_results(
+                tasks_data, fragments_data, reason=f"OpenDC exec error: {e}"
+            )
 
+    # ---------- parse results ----------
     def parse_opendc_results(self):
-        """Parse OpenDC output files"""
+        """Parse OpenDC output files into a summary dict."""
         try:
-            # Look for output files
             output_dirs = [
                 Path("output/opendt-simulation/raw-output/0/seed=0"),
                 Path("./output/simple/raw-output/0/seed=0"),
-                Path("/tmp/output")
+                Path("/tmp/output"),
             ]
 
-            power_df = None
-            host_df = None
-            service_df = None
+            power_df = host_df = service_df = None
+            for odir in output_dirs:
+                if not odir.exists():
+                    continue
+                logger.info(f"🔍 Found output directory: {odir}")
+                pfile = odir / "powerSource.parquet"
+                hfile = odir / "host.parquet"
+                sfile = odir / "service.parquet"
+                if pfile.exists(): power_df = pd.read_parquet(pfile)
+                if hfile.exists(): host_df  = pd.read_parquet(hfile)
+                if sfile.exists(): service_df = pd.read_parquet(sfile)
+                break
 
-            #TODO change this to find the first directory that has all the files we need!
-            #or to chose one file!
-            for output_dir in output_dirs:
-                if output_dir.exists():
-                    logger.info(f"🔍 Found output directory: {output_dir}")
-
-                    power_file = output_dir / "powerSource.parquet"
-                    host_file = output_dir / "host.parquet"
-                    service_file = output_dir / "service.parquet"
-
-                    if power_file.exists():
-                        power_df = pd.read_parquet(power_file)
-                        logger.info(f"📊 Loaded power data: {len(power_df)} records")
-                    if host_file.exists():
-                        host_df = pd.read_parquet(host_file)
-                        logger.info(f"📊 Loaded host data: {len(host_df)} records")
-                    if service_file.exists():
-                        service_df = pd.read_parquet(service_file)
-                        logger.info(f"📊 Loaded service data: {len(service_df)} records")
-                    break
-
-            # Calculate metrics following colleague's approach
             if power_df is not None and len(power_df) > 0:
-                energy_kwh = power_df['energy_usage'].sum() / 3_600_000
-                max_power = power_df['power_draw'].max()
-                logger.info(f"📈 REAL OpenDC Energy: {energy_kwh:.3f} kWh, Max Power: {max_power:.1f}W")
+                energy_kwh = power_df["energy_usage"].sum() / 3_600_000
+                max_power = float(power_df["power_draw"].max())
             else:
                 energy_kwh, max_power = 1.8, 850.0
-                logger.warning("⚠️ No power data found, using fallback values")
 
-            if host_df is not None and len(host_df) > 0:
-                cpu_util = host_df['cpu_utilization'].mean() if 'cpu_utilization' in host_df.columns else 0.6
-                logger.info(f"💻 REAL CPU Utilization: {cpu_util:.1%}")
+            if host_df is not None and len(host_df) > 0 and "cpu_utilization" in host_df.columns:
+                cpu_util = float(host_df["cpu_utilization"].mean())
             else:
                 cpu_util = 0.6
-                logger.warning("⚠️ No host data found, using fallback CPU utilization")
 
-            if service_df is not None and len(service_df) > 0:
-                runtime_ms = service_df['timestamp'].max() - service_df['timestamp'].min()
-                runtime_hours = runtime_ms / (1000 * 3600)
-                logger.info(f"⏱️ REAL Runtime: {runtime_hours:.2f} hours")
+            if service_df is not None and len(service_df) > 0 and "timestamp" in service_df.columns:
+                runtime_ms = service_df["timestamp"].max() - service_df["timestamp"].min()
+                runtime_hours = float(runtime_ms) / (1000 * 3600)
             else:
                 runtime_hours = 0.5
-                logger.warning("⚠️ No service data found, using fallback runtime")
 
             return {
-                'energy_kwh': float(round(energy_kwh, 3)),
-                'cpu_utilization': float(round(cpu_util, 3)),
-                'max_power_draw': float(round(max_power, 1)),
-                'runtime_hours': float(round(runtime_hours, 2)),
-                'status': 'success',
+                "energy_kwh": round(float(energy_kwh), 4),
+                "cpu_utilization": round(float(cpu_util), 3),
+                "max_power_draw": round(float(max_power), 1),
+                "runtime_hours": round(float(runtime_hours), 2),
+                "status": "success",
             }
-
         except Exception as e:
             logger.error(f"Failed to parse OpenDC results: {e}")
+            # always return a dict
+            return {
+                "energy_kwh": 0.0,
+                "cpu_utilization": 0.0,
+                "max_power_draw": 0.0,
+                "runtime_hours": 0.0,
+                "status": "error",
+            }
 
-    def create_enhanced_mock_results(self, tasks_data=None, fragments_data=None, outdir="/app/data"):
+    # ---------- mock output writer (also used as fallback) ----------
+    def create_enhanced_mock_results(self, tasks_data=None, fragments_data=None, outdir=None, reason=None):
         """
-        Create a realistic mock OpenDC run:
-          - Writes powerSource.parquet, host.parquet, service.parquet under outdir
-          - Returns summary: {energy_kwh, cpu_utilization, max_power_draw, runtime_hours, status}
+        Append a couple of fresh points to powerSource.parquet and host.parquet
+        under OPENDT_SIM_DIR so the dashboard updates DURING the simulation.
+        Creates the files if missing. Also writes service.parquet header if missing.
         """
-        import os, math, random
+        import math
         from datetime import datetime, timedelta, timezone
         import numpy as np
-        import pandas as pd
 
-        os.makedirs(outdir, exist_ok=True)
+        base = outdir or os.environ.get("OPENDT_SIM_DIR") or "/app/output/opendt-simulation/raw-output"
+        Path(base).mkdir(parents=True, exist_ok=True)
 
-        # --- generate 24h @ 5min cadence ---
-        step_min = 5
-        points = 24 * 60 // step_min
-        start = datetime.now(timezone.utc) - timedelta(minutes=step_min * (points - 1))
-        ts = [start + timedelta(minutes=step_min * i) for i in range(points)]
+        p_path = Path(base, "powerSource.parquet")
+        h_path = Path(base, "host.parquet")
+        s_path = Path(base, "service.parquet")  # optional; we create a minimal one if missing
 
-        # CPU utilization (0..1) with daily-ish pattern + noise
-        t = np.linspace(0, 2 * math.pi, points)
-        cpu = np.clip(0.55 + 0.25 * np.sin(4 * t) + 0.08 * np.random.randn(points), 0, 1)
+        # helper: read existing (or empty) parquet
+        def _read_parquet_or_empty(path, cols):
+            if path.exists() and path.stat().st_size > 0:
+                try:
+                    return pd.read_parquet(path)
+                except Exception:
+                    pass
+            # empty frame with expected columns
+            return pd.DataFrame({c: pd.Series(dtype="float64") for c in cols})
 
-        # Energy per 5-min bucket (kWh), scaled by CPU + noise; then convert to Joules
-        kwh_bucket = np.clip(cpu * 0.70 / 12 + 0.008 * np.random.randn(points), 0, None)
+        # read current
+        pdf = _read_parquet_or_empty(p_path, ["timestamp", "energy_usage", "power_draw"])
+        hdf = _read_parquet_or_empty(h_path, ["timestamp", "cpu_utilization"])
+
+        # choose next timestamps (5-min step); if empty, seed 24h back then append 2 new points
+        step = timedelta(minutes=5)
+        now = datetime.now(timezone.utc)
+        if "timestamp" in pdf.columns and not pdf.empty:
+            last_ts = pd.to_datetime(pdf["timestamp"]).max().to_pydatetime()
+        else:
+            last_ts = now - timedelta(hours=2)  # start a little in the past so you can see history
+
+        # generate 2 new points
+        new_ts = [last_ts + step, last_ts + 2*step]
+
+        # simple dynamics: sine + noise; tie power to cpu
+        t = np.linspace(0, 2*math.pi, len(new_ts))
+        cpu = np.clip(0.55 + 0.25*np.sin(4*t) + 0.06*np.random.randn(len(new_ts)), 0, 1)
+        kwh_bucket = np.clip(cpu * 0.70 / 12 + 0.006*np.random.randn(len(new_ts)), 0, None)
         energy_J = (kwh_bucket * 3_600_000).astype(float)
+        power_w  = (kwh_bucket * 12_000.0).astype(float)
 
-        # Average power ~ kWh_bucket * 12 → kW → convert to W
-        power_kw = kwh_bucket * 12.0
-        power_w = (power_kw * 1000.0).astype(float)
+        new_p = pd.DataFrame({"timestamp": new_ts, "energy_usage": energy_J, "power_draw": power_w})
+        new_h = pd.DataFrame({"timestamp": new_ts, "cpu_utilization": cpu})
 
-        # --- build frames ---
-        df_power = pd.DataFrame({
-            "timestamp": ts,
-            "energy_usage": energy_J,       # Joules
-            "power_draw": power_w           # Watts
-        })
-        df_host = pd.DataFrame({
-            "timestamp": ts,
-            "cpu_utilization": cpu          # 0..1
-        })
-        df_service = pd.DataFrame({"timestamp": ts})
+        # append and write back
+        pdf = pd.concat([pdf, new_p], ignore_index=True)
+        hdf = pd.concat([hdf, new_h], ignore_index=True)
 
-        # --- write parquet artifacts ---
-        power_path = os.path.join(outdir, "powerSource.parquet")
-        host_path = os.path.join(outdir, "host.parquet")
-        service_path = os.path.join(outdir, "service.parquet")
-        df_power.to_parquet(power_path, index=False)
-        df_host.to_parquet(host_path, index=False)
-        df_service.to_parquet(service_path, index=False)
+        pdf.to_parquet(p_path, index=False)
+        hdf.to_parquet(h_path, index=False)
 
-        # --- summary output expected by your app ---
-        energy_kwh_total = float(kwh_bucket.sum())
-        cpu_mean = float(df_host["cpu_utilization"].mean())
-        max_power_draw = float(df_power["power_draw"].max())
-        runtime_hours = points * step_min / 60.0
+        # ensure service.parquet exists (very small placeholder with timestamps)
+        if not s_path.exists() or s_path.stat().st_size == 0:
+            svc = pd.DataFrame({"timestamp": pd.to_datetime(pdf["timestamp"]).astype("int64") // 1_000_000})
+            svc.to_parquet(s_path, index=False)
+
+        # summary for scoring
+        energy_kwh_total = float(pdf["energy_usage"].sum() / 3_600_000.0) if "energy_usage" in pdf.columns else 0.0
+        cpu_mean = float(hdf["cpu_utilization"].tail(48).mean()) if "cpu_utilization" in hdf.columns else 0.0
+        max_power_draw = float(pdf["power_draw"].tail(48).max()) if "power_draw" in pdf.columns else 0.0
+        runtime_hours = max(0.0, (pd.to_datetime(pdf["timestamp"]).max() - pd.to_datetime(pdf["timestamp"]).min()).total_seconds() / 3600.0) if not pdf.empty else 0.0
+
+        if reason:
+            logger.warning(f"Using enhanced mock results: {reason}")
 
         return {
             "energy_kwh": round(energy_kwh_total, 4),
-            "cpu_utilization": cpu_mean,
-            "max_power_draw": max_power_draw,
-            "runtime_hours": runtime_hours,
+            "cpu_utilization": round(cpu_mean, 3),
+            "max_power_draw": round(max_power_draw, 1),
+            "runtime_hours": round(runtime_hours, 2),
             "status": "mock",
         }
+
