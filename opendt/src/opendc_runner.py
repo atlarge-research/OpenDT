@@ -9,16 +9,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from flask import request, Response, stream_with_context  # request used earlier, Response/SSE used later
-import pandas as pd
-from pathlib import Path
-import glob
-from queue import Queue
-from threading import Lock
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -261,195 +251,132 @@ class OpenDCRunner:
             }
         except Exception as e:
             logger.error(f"Failed to parse OpenDC results: {e}")
-# ---------- File watcher + SSE for results ----------
+    # ---------- parse results ----------
+    def parse_opendc_results(self):
+        """Parse OpenDC output files into a summary dict."""
+        try:
+            output_dirs = [
+                Path("output/opendt-simulation/raw-output/0/seed=0"),
+                Path("./output/simple/raw-output/0/seed=0"),
+                Path("/tmp/output"),
+                # also look at flat OPENDT_SIM_DIR if OpenDC writes there
+                Path(os.environ.get("OPENDT_SIM_DIR") or "/app/output/opendt-simulation/raw-output"),
+            ]
 
-# Where to read REAL vs SIM results from disk
-DATA_DIR = os.environ.get("OPENDT_DATA_DIR", "/app/data")
-REAL_DIR = os.environ.get("OPENDT_REAL_DIR", DATA_DIR)
-SIM_DIR  = os.environ.get("OPENDT_SIM_DIR")  # optional
+            power_df = host_df = service_df = None
+            for odir in output_dirs:
+                if not odir.exists():
+                    continue
+                pfile = odir / "powerSource.parquet"
+                hfile = odir / "host.parquet"
+                sfile = odir / "service.parquet"
+                if pfile.exists(): power_df = pd.read_parquet(pfile)
+                if hfile.exists(): host_df  = pd.read_parquet(hfile)
+                if sfile.exists(): service_df = pd.read_parquet(sfile)
+                if power_df is not None or host_df is not None:
+                    break
 
-_file_events = Queue(maxsize=100)
-_watch_lock = Lock()
-_watch_started = False
+            if power_df is not None and len(power_df) > 0:
+                energy_kwh = power_df["energy_usage"].sum() / 3_600_000
+                max_power = float(power_df["power_draw"].max())
+            else:
+                energy_kwh, max_power = 0.0, 0.0
 
-class _ResultsEventHandler(FileSystemEventHandler):
-    def on_created(self, event): self._notify(event)
-    def on_modified(self, event): self._notify(event)
-    def _notify(self, event):
-        if event.is_directory:
-            return
-        name = os.path.basename(event.src_path)
-        # Notify only on final artifacts; ignore temporary files if any
-        if name.endswith((".csv", ".jsonl", ".parquet", ".json")) and not name.endswith(".tmp"):
-            ts = int(time.time())
-            try:
-                _file_events.put_nowait({"file": name, "ts": ts})
-            except:
-                pass  # queue full; drop silently
+            if host_df is not None and len(host_df) > 0 and "cpu_utilization" in host_df.columns:
+                cpu_util = float(host_df["cpu_utilization"].mean())
+            else:
+                cpu_util = 0.0
 
-def _start_watcher_once():
-    global _watch_started
-    with _watch_lock:
-        if _watch_started:
-            return
-        handler = _ResultsEventHandler()
-        observer = Observer()
-        # Always watch REAL_DIR
-        os.makedirs(REAL_DIR, exist_ok=True)
-        observer.schedule(handler, REAL_DIR, recursive=False)
-        # Also watch SIM_DIR if provided and different
-        if SIM_DIR and os.path.abspath(SIM_DIR) != os.path.abspath(REAL_DIR):
-            os.makedirs(SIM_DIR, exist_ok=True)
-            observer.schedule(handler, SIM_DIR, recursive=True)
-        observer.daemon = True
-        observer.start()
-        _watch_started = True
+            if service_df is not None and len(service_df) > 0 and "timestamp" in service_df.columns:
+                runtime_ms = service_df["timestamp"].max() - service_df["timestamp"].min()
+                runtime_hours = float(runtime_ms) / (1000 * 3600)
+            else:
+                runtime_hours = 0.0
 
-# Safe to call multiple times
-_start_watcher_once()
+            return {
+                "energy_kwh": round(float(energy_kwh), 4),
+                "cpu_utilization": round(float(cpu_util), 3),
+                "max_power_draw": round(float(max_power), 1),
+                "runtime_hours": round(float(runtime_hours), 2),
+                "status": "success",
+            }
+        except Exception as e:
+            logger.error(f"Failed to parse OpenDC results: {e}")
+            return {
+                "energy_kwh": 0.0,
+                "cpu_utilization": 0.0,
+                "max_power_draw": 0.0,
+                "runtime_hours": 0.0,
+                "status": "error",
+            }
 
-@app.route("/api/events/files")
-def sse_files():
-    """Server-Sent Events: emit a 'file' event whenever a result file is created/modified."""
-    @stream_with_context
-    def gen():
-        # initial ping so the client attaches cleanly
-        yield "event: ping\ndata: {}\n\n"
-        while True:
-            try:
-                evt = _file_events.get(timeout=30)
-                yield f"event: file\ndata: {evt['ts']},{evt['file']}\n\n"
-            except:
-                # heartbeat to keep the connection alive
-                yield "event: ping\ndata: {}\n\n"
-    headers = {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-    }
-    return Response(gen(), headers=headers)
+    # ---------- mock output writer (also used as fallback) ----------
+    def create_enhanced_mock_results(self, tasks_data=None, fragments_data=None, outdir=None, reason=None):
+        """
+        Append fresh points to powerSource.parquet and host.parquet
+        under OPENDT_SIM_DIR so the dashboard updates DURING the simulation.
+        Creates the files if missing. Also writes a minimal service.parquet.
+        """
+        import math
+        from datetime import datetime, timedelta, timezone
+        import numpy as np
 
-# ---------- Timeseries (REAL + SIM) ----------
+        base = outdir or os.environ.get("OPENDT_SIM_DIR") or "/app/output/opendt-simulation/raw-output"
+        Path(base).mkdir(parents=True, exist_ok=True)
 
-def _latest_recursive(patterns, base_dir):
-    """Newest file anywhere under base_dir matching any of patterns."""
-    if not base_dir or not os.path.isdir(base_dir):
-        return None
-    files = []
-    for pat in patterns:
-        files.extend(glob.glob(os.path.join(base_dir, "**", pat), recursive=True))
-    return max(files, key=os.path.getmtime) if files else None
+        p_path = Path(base, "powerSource.parquet")
+        h_path = Path(base, "host.parquet")
+        s_path = Path(base, "service.parquet")
 
-def _read_any(path: str) -> pd.DataFrame:
-    """Read parquet/csv/jsonl/json; empty DF on failure/missing."""
-    if not path or not os.path.exists(path):
-        return pd.DataFrame()
-    ext = Path(path).suffix.lower()
-    try:
-        if ext == ".parquet": return pd.read_parquet(path)   # needs pyarrow/fastparquet
-        if ext == ".csv":     return pd.read_csv(path)
-        if ext == ".jsonl":
-            rows = []
-            with open(path, "r", encoding="utf-8") as fh:
-                for line in fh:
-                    try: rows.append(json.loads(line))
-                    except: pass
-            return pd.DataFrame(rows)
-        if ext == ".json":
-            with open(path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            return pd.DataFrame(data if isinstance(data, list) else data.get("rows", []))
-    except Exception:
-        return pd.DataFrame()
-    return pd.DataFrame()
+        def _read_parquet_or_empty(path, cols):
+            if path.exists() and path.stat().st_size > 0:
+                try:
+                    return pd.read_parquet(path)
+                except Exception:
+                    pass
+            return pd.DataFrame({c: pd.Series(dtype="float64") for c in cols})
 
-def _build_from(base_dir):
-    """Build timeseries dict from newest power/host files under base_dir."""
-    out = {"_dir": base_dir, "files": {"power": None, "host": None}}
-    if not base_dir:
-        return out
+        pdf = _read_parquet_or_empty(p_path, ["timestamp", "energy_usage", "power_draw"])
+        hdf = _read_parquet_or_empty(h_path, ["timestamp", "cpu_utilization"])
 
-    # Prefer parquet; otherwise csv/jsonl/json
-    p = _latest_recursive(
-        ["*powerSource*.parquet", "*powerSource*.csv", "*powerSource*.jsonl", "*powerSource*.json"],
-        base_dir
-    )
-    h = _latest_recursive(
-        ["*host*.parquet", "*host*.csv", "*host*.jsonl", "*host*.json"],
-        base_dir
-    )
+        step = timedelta(minutes=5)
+        now = datetime.now(timezone.utc)
+        last_ts = pd.to_datetime(pdf["timestamp"]).max().to_pydatetime() if ("timestamp" in pdf.columns and not pdf.empty) else now - timedelta(hours=2)
 
-    if p: out["files"]["power"] = os.path.relpath(p, base_dir)
-    if h: out["files"]["host"]  = os.path.relpath(h, base_dir)
+        new_ts = [last_ts + step, last_ts + 2*step]
+        t = np.linspace(0, 2*math.pi, len(new_ts))
+        cpu = np.clip(0.55 + 0.25*np.sin(4*t) + 0.06*np.random.randn(len(new_ts)), 0, 1)
+        kwh_bucket = np.clip(cpu * 0.70 / 12 + 0.006*np.random.randn(len(new_ts)), 0, None)
+        energy_J = (kwh_bucket * 3_600_000).astype(float)
+        power_w  = (kwh_bucket * 12_000.0).astype(float)
 
-    pdf = _read_any(p); hdf = _read_any(h)
+        new_p = pd.DataFrame({"timestamp": new_ts, "energy_usage": energy_J, "power_draw": power_w})
+        new_h = pd.DataFrame({"timestamp": new_ts, "cpu_utilization": cpu})
 
-    if not pdf.empty:
-        x = pd.to_datetime(pdf.get("timestamp", pd.RangeIndex(len(pdf))), errors="coerce").astype(str).tolist()
-        power_draw = pdf["power_draw"].tolist() if "power_draw" in pdf.columns else [None]*len(x)
-        # energy_usage (J) -> cumulative kWh
-        energy_kwh_cum = (pdf["energy_usage"].fillna(0)/3_600_000.0).cumsum().round(6).tolist() if "energy_usage" in pdf.columns else []
-        out["power"] = {"x": x, "power_draw": power_draw, "energy_kwh_cum": energy_kwh_cum}
+        pdf = pd.concat([pdf, new_p], ignore_index=True)
+        hdf = pd.concat([hdf, new_h], ignore_index=True)
 
-    if not hdf.empty:
-        hx = pd.to_datetime(hdf.get("timestamp", pd.RangeIndex(len(hdf))), errors="coerce").astype(str).tolist()
-        cpu = hdf["cpu_utilization"].tolist() if "cpu_utilization" in hdf.columns else [None]*len(hx)
-        out["host"] = {"x": hx, "cpu_utilization": cpu}
+        pdf.to_parquet(p_path, index=False)
+        hdf.to_parquet(h_path, index=False)
 
-    return out
+        if not s_path.exists() or s_path.stat().st_size == 0:
+            svc = pd.DataFrame({"timestamp": pd.to_datetime(pdf["timestamp"]).astype("int64") // 1_000_000})
+            svc.to_parquet(s_path, index=False)
 
-@app.route("/api/sim/timeseries")
-def api_sim_timeseries():
-    """Return REAL (from REAL_DIR) and SIM (from SIM_DIR) series."""
-    real = _build_from(REAL_DIR)
-    sim  = _build_from(SIM_DIR) if SIM_DIR else {}
+        energy_kwh_total = float(pdf["energy_usage"].sum() / 3_600_000.0) if "energy_usage" in pdf.columns else 0.0
+        cpu_mean = float(hdf["cpu_utilization"].tail(48).mean()) if "cpu_utilization" in hdf.columns else 0.0
+        max_power_draw = float(pdf["power_draw"].tail(48).max()) if "power_draw" in pdf.columns else 0.0
+        runtime_hours = 0.0
+        if not pdf.empty:
+            runtime_hours = (pd.to_datetime(pdf["timestamp"]).max() - pd.to_datetime(pdf["timestamp"]).min()).total_seconds() / 3600.0
 
-    # only "empty" if BOTH have no series
-    real_has = ("power" in real) or ("host" in real)
-    sim_has  = ("power" in sim)  or ("host" in sim)
-    if not real_has and not sim_has:
-        return jsonify({
-            "status": "empty",
-            "source_files": {"real": real.get("files", {}), "sim": sim.get("files", {}) if sim else {}},
-            "mtime": 0
-        })
+        if reason:
+            logger.warning(f"Using enhanced mock results: {reason}")
 
-    # newest mtime across any used file (real or sim)
-    mtimes = []
-    for group in (g for g in (real, sim) if g):
-        for rel in (group.get("files") or {}).values():
-            if not rel:
-                continue
-            p = os.path.join(group.get("_dir", ""), rel)
-            if os.path.exists(p):
-                mtimes.append(os.path.getmtime(p))
-
-    payload = {
-        "status": "ok",
-        "source_files": {"real": real.get("files", {}), **({"sim": sim.get("files", {})} if sim else {})},
-        **({"power": real.get("power")} if "power" in real else {}),
-        **({"host":  real.get("host")}  if "host"  in real else {}),
-        **({"power_sim": sim.get("power")} if "power" in sim else {}),
-        **({"host_sim":  sim.get("host")}  if "host"  in sim else {}),
-        "mtime": int(max(mtimes)) if mtimes else 0,
-    }
-    return jsonify(json.loads(json.dumps(payload, default=str)))
-
-# ---------- Accept recommendation endpoint (kept) ----------
-
-@app.route('/api/accept_recommendation', methods=['POST'])
-def api_accept_recommendation():
-    try:
-        last_opt = orchestrator.state.get('last_optimization', {})
-        proposed_topology = last_opt.get('new_topology')
-        if not proposed_topology:
-            return jsonify({'error': 'No pending recommendation to accept'}), 400
-
-        if orchestrator.update_topology_file(proposed_topology):
-            orchestrator.state['window_accepted'] = True
-            return jsonify({'status': 'success', 'message': 'Recommendation accepted and topology updated'})
-        else:
-            return jsonify({'error': 'Failed to update topology'}), 500
-    except Exception as e:
-        logger.error(f"Error accepting recommendation: {e}")
-        return jsonify({'error': str(e)}), 500
+        return {
+            "energy_kwh": round(energy_kwh_total, 4),
+            "cpu_utilization": round(cpu_mean, 3),
+            "max_power_draw": round(max_power_draw, 1),
+            "runtime_hours": round(runtime_hours, 2),
+            "status": "mock",
+        }

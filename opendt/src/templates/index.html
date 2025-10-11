@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <title>OpenDT Digital Twin</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <!-- Plotly MUST load before index.js -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -41,7 +46,6 @@
       </div>
     </section>
 
-
     <!-- Metrics -->
     <section class="metrics">
       <div class="metric glass lift sheen">
@@ -50,17 +54,17 @@
         <div class="meta">Optimization Cycles</div>
       </div>
 
-    <div class="metric glass lift sheen">
-      <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
-      <div id="mTasks" class="value">0</div>
-      <div class="meta">Current Tasks</div>
-    </div>
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
+        <div id="mTasks" class="value">0</div>
+        <div class="meta">Current Tasks</div>
+      </div>
 
-    <div class="metric glass lift sheen">
-      <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
-      <div id="mFragments" class="value">0</div>
-      <div class="meta">Current Fragments</div>
-    </div>
+      <div class="metric glass lift sheen">
+        <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
+        <div id="mFragments" class="value">0</div>
+        <div class="meta">Current Fragments</div>
+      </div>
 
       <div class="metric glass lift sheen">
         <h3><span class="icon" style="--icon-url:var(--sym-bolt)"></span>&nbsp;ENERGY</h3>
@@ -104,45 +108,28 @@
             <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
             <div><span>Runtime (h)</span><strong id="kvRuntime">—</strong></div>
             <div><span>Max Power (W)</span><strong id="kvMaxPower">—</strong></div>
-            <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div> 
-            
+            <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
           </div>
-          
 
-          <div class="kv">  
+          <div class="kv">
             <div class="input-group">
               <span>Energy</span>
               <div class="pill-input">
-                <input type="number" 
-                      id="energy_input" 
-                      class="pill-field" 
-                      placeholder="10"
-                      min="0" 
-                      step="1">
+                <input type="number" id="energy_input" class="pill-field" placeholder="10" min="0" step="1">
               </div>
             </div>
-          
+
             <div class="input-group">
               <span>Runtime</span>
               <div class="pill-input">
-                <input type="number" 
-                      id="runtime_input" 
-                      class="pill-field" 
-                      placeholder="2"
-                      min="0" 
-                      step="1">
+                <input type="number" id="runtime_input" class="pill-field" placeholder="2" min="0" step="1">
               </div>
-
-              
             </div>
+
             <div class="rec-actions">
-                <button id="submit_slo" class="btn btn-primary" onclick="submitSLO()">
-                  Submit
-                </button>
+              <button id="submit_slo" class="btn btn-primary" onclick="submitSLO()">Submit</button>
             </div>
-            
           </div>
-
         </div>
         <pre class="json-only" id="simJSON">null</pre>
       </div>
@@ -161,8 +148,7 @@
           <div class="panel">
             <div class="panel-title">Recommendations</div>
             <ul id="kvLLMRecs"><li>—</li></ul>
-            
-            <!-- Action button -->
+
             <div class="rec-actions">
               <button id="btnAcceptRec" class="btn btn-success" onclick="acceptRecommendation()">
                 Accept Recommendation
@@ -203,8 +189,38 @@
       <div class="ui-only"><div id="bestScore" class="badge">Score: —</div></div>
       <pre class="json-only" id="bestJSON">null</pre>
     </section>
-  </div>
 
+    <!-- Charts -->
+    <div class="card glass lift">
+      <h3>CPU — Real vs Sim</h3>
+
+      <!-- chart toolbar -->
+      <div class="chart-toolbar">
+        <span class="hint">drag to zoom · double-click to reset</span>
+      </div>
+
+      <div id="chart-cpu" class="chart"></div>
+    </div>
+
+    <div class="card glass lift">
+      <h3>Power — Real vs Sim</h3>
+      <div class="chart-toolbar">
+        <span class="hint">drag to zoom · double-click to reset</span>
+      </div>
+      <div id="chart-power" class="chart"></div>
+    </div>
+
+    <div class="card glass lift">
+      <h3>Cumulative Energy (kWh)</h3>
+      <div class="chart-toolbar">
+        <span class="hint">drag to zoom · double-click to reset</span>
+      </div>
+      <div id="chart-energy" class="chart"></div>
+    </div>
+  </div> <!-- /.container -->
+
+  <!-- JS (load once, after Plotly) -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="{{ url_for('static', filename='index.js') }}"></script>
 </body>
 </html>
