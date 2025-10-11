@@ -1,4 +1,4 @@
-﻿#!/bin/sh
+#!/bin/sh
 set -e
 
 # Recompute JAVA_HOME safely in case image/base changes
@@ -19,6 +19,6 @@ if [ -f "$RUNNER" ]; then
 fi
 
 #give perms to run script
-chmod 777 ./run.sh
+#chmod 777 /app/run.sh
 
 exec "$@"

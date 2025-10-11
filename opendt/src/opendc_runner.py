@@ -251,6 +251,7 @@ class OpenDCRunner:
             }
         except Exception as e:
             logger.error(f"Failed to parse OpenDC results: {e}")
+<<<<<<< HEAD
             # always return a dict
             return {
                 "energy_kwh": 0.0,
@@ -342,3 +343,5 @@ class OpenDCRunner:
             "status": "mock",
         }
 
+=======
+>>>>>>> 658302df2e3dabd73f38e9019164cdda7b59332f

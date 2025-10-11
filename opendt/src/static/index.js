@@ -2,8 +2,8 @@ const $ = s => document.querySelector(s);
 const modeKey = 'opendt-view-mode';
 
 // ---- helpers -------------------------------------------------
-function fmt(n, d = 1) { return (n === null || n === undefined || isNaN(n)) ? '—' : Number(n).toFixed(d); }
-function pct(n, d = 1) { return (n === null || n === undefined || isNaN(n)) ? '—' : (Number(n) * 100).toFixed(d) + '%'; }
+function fmt(n, d=1){ return (n===null||n===undefined||isNaN(n)) ? '—' : Number(n).toFixed(d); }
+function pct(n, d=1){ return (n===null||n===undefined||isNaN(n)) ? '—' : (Number(n)*100).toFixed(d) + '%'; }
 
 // Parse "Window 1: 121 tasks, 1155 fragments"
 function parseWindowCounts(info){
@@ -12,14 +12,6 @@ function parseWindowCounts(info){
   const toInt = s => parseInt(String(s).replace(/,/g,''), 10);
   return { tasks: toInt(m[1]), frags: toInt(m[2]) };
 }
-
-
-// Minimal, soft palette for dark UI
-const COLORS = {
-  real: '#7dd3fc',  // soft cyan (Real)
-  sim:  '#fbbf24',  // soft amber (Sim)
-};
-
 
 // ---- UI mode / button ripple --------------------------------
 document.addEventListener('click', e => {
@@ -79,12 +71,12 @@ function renderMetrics(s){
   if (llmTypeEl) llmTypeEl.innerHTML = typ !== '—' ? `<span class="badge">${typ}</span>` : '—';
 }
 
-function renderOpenDC(sim){
+function renderOpenDC(sim,s){
   $('#kvEnergy')   && ($('#kvEnergy').textContent   = fmt(sim.energy_kwh, 2));
   $('#kvCPU')      && ($('#kvCPU').textContent      = pct(sim.cpu_utilization, 1));
   $('#kvRuntime')  && ($('#kvRuntime').textContent  = fmt(sim.runtime_hours, 1));
   $('#kvMaxPower') && ($('#kvMaxPower').textContent = fmt(sim.max_power_draw, 0));
-  $('#kvSimType')  && ($('#kvSimType').textContent  = sim.status || '—');
+  $('#kvSimType')  && ($('#kvSimType').textContent  = fmt(s.cycle_count_opt) ?? '—');
 
   const pre = $('#simJSON');
   const txt = JSON.stringify(sim || null, null, 2);
@@ -149,6 +141,33 @@ function renderBest(best){
   if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
+// ---- Recommendation Action -------------------------------------------------
+async function acceptRecommendation() {
+  try {
+    const btn = $('#btnAcceptRec');
+    if (btn) btn.disabled = true;
+    
+    const response = await fetch('/api/accept_recommendation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Refresh the UI
+    await poll();
+  } catch(e) {
+    console.error('Failed to accept recommendation:', e);
+  } finally {
+    const btn = $('#btnAcceptRec');
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ---- polling -------------------------------------------------
 async function poll(){
   try{
@@ -157,16 +176,16 @@ async function poll(){
 
     applyStatus(s.status);
 
-    // right-side window pill text
+    // NEW: right-side window pill text
     const wp = document.querySelector('#windowPill');
     if (wp) {
-      const n = s.cycle_count ?? null;
-      const info = s.current_window || '';
+      const n = s.cycle_count ?? null;                 // window number
+      const info = s.current_window || '';             // "Window 1: …"
       wp.textContent = n ? `Window ${n}` : (info || '—');
     }
 
     renderMetrics(s);
-    renderOpenDC(s.last_simulation || {});
+    renderOpenDC(s.last_optimization || {},s);
     renderLLM(s.last_optimization || {});
     renderTopoTable(s.current_topology || null);
     renderBest(s.best_config || null);
@@ -177,40 +196,32 @@ setMode(localStorage.getItem(modeKey) || 'ui');
 poll();
 setInterval(poll, 2000);
 
-// ===== Mock charts (client-side) =====
-function mkTimeline(points = 24*12, stepMin = 5) {
-  const now = Date.now();
-  const step = stepMin * 60 * 1000;
-  const xs = [];
-  for (let i = points - 1; i >= 0; i--) xs.push(new Date(now - i * step));
-  return xs;
-}
+// ---- SLO submit handler -------------------------------------------------
+async function submitSLO() {
+  const btn = document.getElementById('submit_slo');
+  if (!btn) return;
 
-function mockSeries() {
-  const x = mkTimeline();
-  const n = x.length;
-  const cpuReal = [], cpuSim = [], eReal = [], eSim = [];
+  try {
+    const energy = parseFloat(document.getElementById('energy_input').value);
+    const runtime = parseFloat(document.getElementById('runtime_input').value);
+    
+    // Validate inputs
+    if (isNaN(energy) || isNaN(runtime)) {
+      console.error('Invalid input values');
+      btn.classList.add('btn-danger');
+      setTimeout(() => {
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-primary');
+      }, 1000);
+      return;
+    }
 
-  for (let i = 0; i < n; i++) {
-    const t = i / n;
-    const base = 55 + 25 * Math.sin(t * Math.PI * 4);
-    const jitter = (a) => a + (Math.random() - 0.5) * 8;
-    const cr = Math.max(0, Math.min(100, jitter(base)));
-    const cs = Math.max(0, Math.min(100, cr * 0.97 + (Math.random() - 0.5) * 5));
-    cpuReal.push(cr);
-    cpuSim.push(cs);
-    const er = Math.max(0, cr/100 * 0.70/12 + (Math.random() - 0.5) * 0.008);
-    const es = Math.max(0, cs/100 * 0.68/12 + (Math.random() - 0.5) * 0.008);
-    eReal.push(er); eSim.push(es);
-  }
-  const pReal = eReal.map(v => v * 12);
-  const pSim  = eSim.map(v => v * 12);
-  let crCum = 0, csCum = 0;
-  const cumReal = eReal.map(v => (crCum += v));
-  const cumSim  = eSim.map(v => (csCum += v));
-  return { x, cpuReal, cpuSim, pReal, pSim, cumReal, cumSim };
-}
+    // Disable button and store class
+    btn.disabled = true;
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-ghost');
 
+<<<<<<< HEAD
 // -------- Plotly styling & interactivity helpers --------
 const PLOTLY_CONFIG = {
   responsive: true,
@@ -405,3 +416,46 @@ document.addEventListener('DOMContentLoaded', () => {
   try { startSse(); } catch(_) {}
   setInterval(() => { try { drawReal(); } catch(_) {} }, 5000);
 });
+=======
+    const response = await fetch('/api/set_slo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        energy_target: energy,
+        runtime_target: runtime
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Update pill sigils
+    const energySigil = document.querySelector('#energy_input').closest('.pill-input').querySelector('.pill-sigil');
+    const runtimeSigil = document.querySelector('#runtime_input').closest('.pill-input').querySelector('.pill-sigil');
+    if (energySigil) energySigil.textContent = fmt(energy, 2);
+    if (runtimeSigil) runtimeSigil.textContent = fmt(runtime, 1);
+
+    // Success feedback
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-success');
+    setTimeout(() => {
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-primary');
+    }, 1000);
+
+  } catch (error) {
+    console.error('Failed to submit SLO:', error);
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-danger');
+    setTimeout(() => {
+      btn.classList.remove('btn-danger');
+      btn.classList.add('btn-primary');
+    }, 1000);
+  } finally {
+    btn.disabled = false;
+  }
+}
+>>>>>>> 658302df2e3dabd73f38e9019164cdda7b59332f
