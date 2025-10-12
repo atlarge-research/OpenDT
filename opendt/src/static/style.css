@@ -685,3 +685,84 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 .js-plotly-plot .modebar-btn:focus-visible { outline: none !important; }
 
 .plotly-notifier { display: none !important; }
+
+/* --- SLO pill: glass gradient + soft shadow to match controls --- */
+.controls .slo-combo{
+  display:flex; align-items:center; gap:14px; padding:10px 14px;
+  border-radius:999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 92%, transparent) 0%, transparent 100%),
+    var(--surface-weak);
+  border:1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.45) inset,
+    0 10px 24px rgba(16,18,27,.10);
+}
+
+/* inline label + value styling */
+.slo-item{ display:flex; align-items:center; gap:10px; }
+.slo-item label{
+  font-size:12px; font-weight:800; letter-spacing:.02em;
+  color: var(--ink-muted);
+}
+
+/* value chip look for inputs (like other counters) */
+.slo-inline-field{
+  width:84px; padding:6px 12px; border:0; border-radius:999px;
+  background: rgba(255,255,255,.75);
+  color: var(--ink); font-size:13px; font-weight:800; outline:none;
+  box-shadow: 0 1px 0 rgba(255,255,255,.45) inset;
+  transition: background var(--dur-quick) var(--ease-spring), box-shadow var(--dur-quick);
+}
+.slo-inline-field::placeholder{ color: color-mix(in srgb, var(--ink-muted) 80%, transparent); }
+
+/* focus = subtle blue glow to match primary */
+.slo-inline-field:focus{
+  background: var(--surface-strong);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--blue) 22%, transparent),
+    0 1px 0 rgba(255,255,255,.5) inset;
+}
+
+/* divider tone aligned with other pills */
+.slo-divider{
+  width:1px; height:22px;
+  background: color-mix(in srgb, var(--glass-border) 80%, #fff 20%);
+  border-radius:1px;
+}
+
+/* hover polish consistent with controls */
+.controls .slo-combo:hover{
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.45) inset,
+    0 14px 30px rgba(16,18,27,.14);
+}
+
+/* dark mode tune */
+@media (prefers-color-scheme: dark){
+  .controls .slo-combo{
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.06), transparent),
+      var(--surface-weak);
+    border-color: var(--glass-border);
+  }
+  .slo-inline-field{
+    background: rgba(255,255,255,.10);
+    color: var(--ink);
+    box-shadow: 0 1px 0 rgba(255,255,255,.06) inset;
+  }
+  .slo-inline-field:focus{
+    background: rgba(255,255,255,.16);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--blue) 30%, transparent),
+      0 1px 0 rgba(255,255,255,.08) inset;
+  }
+}
+
+.controls .slo-combo::before{
+  content:""; width:6px; height:6px; border-radius:999px; margin-right:6px;
+  background: color-mix(in srgb, var(--blue) 70%, #00b5e2 30%);
+  box-shadow: 0 0 0 3px rgba(0,123,255,.08);
+}
