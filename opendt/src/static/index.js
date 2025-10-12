@@ -141,6 +141,25 @@ function renderBest(best){
   if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
+// ----- time normalization helpers (fix 1970) -----
+function _isBadEpoch(v){
+  const d = new Date(v);
+  return !isFinite(d) || d.getFullYear() < 2000;
+}
+function _genTimeline(count, stepMs = 5*60*1000, anchorMs = Date.now()){
+  const start = anchorMs - (count - 1) * stepMs;
+  const arr = new Array(count);
+  for (let i = 0; i < count; i++) arr[i] = new Date(start + i*stepMs).toISOString();
+  return arr;
+}
+function _normalizeX(x, yLen, stepMs = 5*60*1000, anchorMs = Date.now()){
+  if (Array.isArray(x) && x.length === yLen && x.length > 0) {
+    const first = x.find(v => v != null);
+    if (first && !_isBadEpoch(first)) return x;          // already real timestamps
+  }
+  return _genTimeline(yLen, stepMs, anchorMs);           // fabricate sane "now" timeline
+}
+
 // ---- Recommendation Action -------------------------------------------------
 async function acceptRecommendation() {
   try {
@@ -269,27 +288,28 @@ const COLORS = {
 };
 
 // Build layout with optional date features
-function layoutFor(title) {
+function layoutFor(title, opts = {}) {
+  const { yTickformat = null } = opts;
   return {
     title,
+    uirevision: UIREVISION,
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor:  'rgba(0,0,0,0)',
-    margin: { l: 60, r: 140, t: 80, b: 80 },   // extra right room for legend
-    font: { color: 'rgba(236,240,241,0.9)' },
+    margin: { l: 70, r: 140, t: 60, b: 70 },
+    font: { color: 'rgba(236,240,241,0.95)' },
 
     legend: {
       x: 1.02, y: 1, xanchor: 'left', yanchor: 'top',
-      bgcolor: 'rgba(0,0,0,0)', bordercolor: 'rgba(255,255,255,0.08)',
-      borderwidth: 0, orientation: 'v', font: { size: 13 }
+      bgcolor: 'rgba(0,0,0,0)'
     },
 
     xaxis: {
-      title: 'Time',
+      title: { text: 'Time', standoff: 8 },
       type: 'date',
-      gridcolor: COLORS.grid,
-      zeroline: false,
-
-      // Put the quick range buttons back to the left, above the plot
+      showgrid: true, gridcolor: COLORS.grid,
+      showline: true, linecolor: '#cbd5e1', linewidth: 1.2,
+      ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 6,
+      rangeslider: { visible: true, bgcolor: 'rgba(255,255,255,0.05)' },
       rangeselector: {
         x: 0.02, xanchor: 'left', y: 1.15, yanchor: 'top',
         buttons: [
@@ -297,19 +317,15 @@ function layoutFor(title) {
           { step: 'hour',   stepmode: 'backward', count: 2,  label: '2h' },
           { step: 'day',    stepmode: 'backward', count: 1,  label: '1d' },
           { step: 'all', label: 'All' },
-        ],
-        bgcolor: 'rgba(255,255,255,0.08)',
-        activecolor: 'rgba(255,255,255,0.20)',
-        bordercolor: 'rgba(255,255,255,0.10)',
-        font: { color: 'rgba(236,240,241,0.92)' }
-      },
-
-      rangeslider: { visible: true, bgcolor: 'rgba(255,255,255,0.05)' }
+        ]
+      }
     },
 
     yaxis: {
-      gridcolor: COLORS.grid,
-      zeroline: false
+      showgrid: true, gridcolor: COLORS.grid,
+      showline: true, linecolor: '#cbd5e1', linewidth: 1.2,
+      ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 6,
+      tickformat: yTickformat || undefined
     }
   };
 }
@@ -324,81 +340,55 @@ async function fetchTS() {
 
 async function drawCharts(){
   const d = await fetchTS();
-  if(d.status !== 'ok') return;
+  if (d.status !== 'ok') return;
 
-  // CPU
+  // anchor charts to "latest write time" or now
+  const ANCHOR_MS = (d.mtime ? d.mtime * 1000 : Date.now());
+  const STEP_MS = 5 * 60 * 1000; // 5 minutes
+
+  // ===== CPU
   {
+    const yR = d.host?.cpu_utilization || [];
+    const yS = d.host_sim?.cpu_utilization || [];
+    const xR = _normalizeX(d.host?.x,      yR.length, STEP_MS, ANCHOR_MS);
+    const xS = _normalizeX(d.host_sim?.x,  yS.length, STEP_MS, ANCHOR_MS);
+
     const traces = [];
-    if (d.host) {
-      traces.push({
-        x: d.host.x,
-        y: d.host.cpu_utilization,
-        mode: 'lines',
-        name: 'Real CPU (%)',
-        line: { color: COLORS.real, width: 2 }
-      });
-    }
-    if (d.host_sim) {
-      traces.push({
-        x: d.host_sim.x,
-        y: d.host_sim.cpu_utilization,
-        mode: 'lines',
-        name: 'Sim CPU (%)',
-        line: { color: COLORS.sim, width: 2, dash: 'dash' }
-      });
-    }
-    Plotly.react('chart-cpu', traces, layoutFor('CPU Utilization — Real vs Sim'), PLOTLY_CONFIG);
+    if (yR.length) traces.push({ x: xR, y: yR, mode:'lines', name:'Real CPU', line:{ color: COLORS.real, width: 2 } });
+    if (yS.length) traces.push({ x: xS, y: yS, mode:'lines', name:'Sim CPU',  line:{ color: COLORS.sim,  width: 2, dash:'dash' } });
+
+    Plotly.react('chart-cpu', traces, layoutFor('CPU Utilization — Real vs Sim', { yTickformat: ',.0%' }), PLOTLY_CONFIG);
   }
 
-  // Power
+  // ===== Power
   {
+    const yR = d.power?.power_draw || [];
+    const yS = d.power_sim?.power_draw || [];
+    const xR = _normalizeX(d.power?.x,      yR.length, STEP_MS, ANCHOR_MS);
+    const xS = _normalizeX(d.power_sim?.x,  yS.length, STEP_MS, ANCHOR_MS);
+
     const traces = [];
-    if (d.power) {
-      traces.push({
-        x: d.power.x,
-        y: d.power.power_draw,
-        mode: 'lines',
-        name: 'Real Power (W)',
-        line: { color: COLORS.real, width: 2 }
-      });
-    }
-    if (d.power_sim) {
-      traces.push({
-        x: d.power_sim.x,
-        y: d.power_sim.power_draw,
-        mode: 'lines',
-        name: 'Sim Power (W)',
-        line: { color: COLORS.sim, width: 2, dash: 'dash' }
-      });
-    }
+    if (yR.length) traces.push({ x: xR, y: yR, mode:'lines', name:'Real Power (W)', line:{ color: COLORS.real, width: 2 } });
+    if (yS.length) traces.push({ x: xS, y: yS, mode:'lines', name:'Sim Power (W)',  line:{ color: COLORS.sim,  width: 2, dash:'dash' } });
+
     Plotly.react('chart-power', traces, layoutFor('Power — Real vs Sim'), PLOTLY_CONFIG);
   }
 
-  // Cumulative Energy
+  // ===== Cumulative Energy
   {
+    const yR = d.power?.energy_kwh_cum || [];
+    const yS = d.power_sim?.energy_kwh_cum || [];
+    const xR = _normalizeX(d.power?.x,      yR.length, STEP_MS, ANCHOR_MS);
+    const xS = _normalizeX(d.power_sim?.x,  yS.length, STEP_MS, ANCHOR_MS);
+
     const traces = [];
-    if (d.power) {
-      traces.push({
-        x: d.power.x,
-        y: d.power.energy_kwh_cum,
-        mode: 'lines',
-        name: 'Real Cumulative (kWh)',
-        line: { color: COLORS.real, width: 2 }
-      });
-    }
-    if (d.power_sim) {
-      traces.push({
-        x: d.power_sim.x,
-        y: d.power_sim.energy_kwh_cum,
-        mode: 'lines',
-        name: 'Sim Cumulative (kWh)',
-        line: { color: COLORS.sim, width: 2, dash: 'dash' }
-      });
-    }
+    if (yR.length) traces.push({ x: xR, y: yR, mode:'lines', name:'Real Cumulative (kWh)', line:{ color: COLORS.real, width: 2 } });
+    if (yS.length) traces.push({ x: xS, y: yS, mode:'lines', name:'Sim Cumulative (kWh)',  line:{ color: COLORS.sim,  width: 2, dash:'dash' } });
+
     Plotly.react('chart-energy', traces, layoutFor('Cumulative Energy — Real vs Sim'), PLOTLY_CONFIG);
   }
-
 }
+
 
 // Optional SSE refresh (if your backend emits it)
 function startSse(){
@@ -416,4 +406,5 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // safety poll every 5s
   setInterval(()=>{ drawCharts().catch(()=>{}); }, 5000);
 });
+
 

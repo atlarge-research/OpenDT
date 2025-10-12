@@ -5,7 +5,7 @@ import os
 import threading
 import logging
 import hashlib
-from flask import Flask, render_template, jsonify, stream_with_context
+from flask import Flask, render_template, jsonify, stream_with_context, Response, request
 from kafka_producer import TimedKafkaProducer
 from kafka_consumer import DigitalTwinConsumer
 from opendc_runner import OpenDCRunner
@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-from flask import request
 
 @app.route('/api/set_slo', methods=['POST'])
 def set_slo():
@@ -575,7 +574,6 @@ def api_sim_timeseries():
         "mtime": int(max(mtimes)) if mtimes else 0,
     }
     return jsonify(json.loads(json.dumps(payload, default=str)))
-# ======== end ========
 
 
 if __name__ == '__main__':
