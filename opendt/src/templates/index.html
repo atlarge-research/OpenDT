@@ -1,226 +1,239 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>OpenDT Digital Twin</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8"/>
+    <title>OpenDT Digital Twin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
-  <!-- CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
-  <!-- Plotly MUST load before index.js -->
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <!-- Plotly MUST load before index.js -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
-  <div class="container">
+<div class="container">
     <!-- Title slate -->
     <header class="header glass sheen lift energy-header">
-      <h1>
-        <span class="icon" style="--icon-url:var(--sym-gauge)"></span>
-        &nbsp;OpenDT Digital Twin Dashboard
-      </h1>
-      <p class="sub">Real-time datacenter simulation in rolling windows · LLM-guided topology optimization</p>
+        <h1>
+            <span class="icon" style="--icon-url:var(--sym-gauge)"></span>
+            &nbsp;OpenDT Digital Twin Dashboard
+        </h1>
+        <p class="sub">Real-time datacenter simulation in rolling windows · LLM-guided topology optimization</p>
     </header>
 
     <!-- Controls -->
     <section class="controls glass lift">
-      <div class="row">
-        <button id="toggleBtn" class="btn btn-primary" onclick="toggleSystem()" data-tip="Start / Stop">
-          <span class="icon" style="--icon-url:var(--sym-play)"></span>&nbsp;Start
-        </button>
+        <div class="row">
+            <button id="toggleBtn" class="btn btn-primary" onclick="toggleSystem()" data-tip="Start / Stop">
+                <span class="icon" style="--icon-url:var(--sym-play)"></span>&nbsp;Start
+            </button>
 
-        <div id="statusPill" class="status stopped">
-          <span class="dot"></span>
-          <strong>Status:</strong>
-          <span id="statusText">STOPPED</span>
+            <div id="statusPill" class="status stopped">
+                <span class="dot"></span>
+                <strong>Status:</strong>
+                <span id="statusText">STOPPED</span>
+            </div>
+
+            <div class="mode-switch">
+                <div class="seg">
+                    <button id="btnModeUI" class="active" onclick="setMode('ui')">UI</button>
+                    <button id="btnModeJSON" onclick="setMode('json')">JSON</button>
+                </div>
+            </div>
+
+            <div id="windowPill" class="window-pill pill">Window —</div>
         </div>
-
-        <div class="mode-switch">
-          <div class="seg">
-            <button id="btnModeUI" class="active" onclick="setMode('ui')">UI</button>
-            <button id="btnModeJSON" onclick="setMode('json')">JSON</button>
-          </div>
-        </div>
-
-        <div id="windowPill" class="window-pill pill">Window —</div>
-      </div>
     </section>
 
     <!-- Metrics -->
     <section class="metrics">
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-chart)"></span>&nbsp;PROCESSING</h3>
-        <div id="mCycles" class="value">0</div>
-        <div class="meta">Optimization Cycles</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-chart)"></span>&nbsp;PROCESSING</h3>
+            <div id="mCycles" class="value">0</div>
+            <div class="meta">Optimization Cycles</div>
+        </div>
 
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
-        <div id="mTasks" class="value">0</div>
-        <div class="meta">Current Tasks</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
+            <div id="mTasks" class="value">0</div>
+            <div class="meta">Current Tasks</div>
+        </div>
 
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
-        <div id="mFragments" class="value">0</div>
-        <div class="meta">Current Fragments</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
+            <div id="mFragments" class="value">0</div>
+            <div class="meta">Current Fragments</div>
+        </div>
 
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-bolt)"></span>&nbsp;ENERGY</h3>
-        <div id="mEnergy" class="value">—</div>
-        <div class="meta">kWh Usage</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-bolt)"></span>&nbsp;ENERGY</h3>
+            <div id="mEnergy" class="value">—</div>
+            <div class="meta">kWh Usage</div>
+        </div>
 
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-cpu)"></span>&nbsp;CPU</h3>
-        <div id="mCPU" class="value">—</div>
-        <div class="meta">Utilization</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-cpu)"></span>&nbsp;CPU</h3>
+            <div id="mCPU" class="value">—</div>
+            <div class="meta">Utilization</div>
+        </div>
 
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-clock)"></span>&nbsp;RUNTIME</h3>
-        <div id="mRuntime" class="value">—</div>
-        <div class="meta">Simulation Time</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-clock)"></span>&nbsp;RUNTIME</h3>
+            <div id="mRuntime" class="value">—</div>
+            <div class="meta">Simulation Time</div>
+        </div>
 
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;TOPOLOGY</h3>
-        <div id="mTopoUpdates" class="value">0</div>
-        <div class="meta">Infrastructure Adjustment(s)</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;TOPOLOGY</h3>
+            <div id="mTopoUpdates" class="value">0</div>
+            <div class="meta">Infrastructure Adjustment(s)</div>
+        </div>
 
-      <div class="metric glass lift sheen">
-        <h3><span class="icon" style="--icon-url:var(--sym-wand)"></span>&nbsp;LLM</h3>
-        <div id="mLLMAction" class="value">—</div>
-        <div class="meta" id="mLLMType">—</div>
-      </div>
+        <div class="metric glass lift sheen">
+            <h3><span class="icon" style="--icon-url:var(--sym-wand)"></span>&nbsp;LLM</h3>
+            <div id="mLLMAction" class="value">—</div>
+            <div class="meta" id="mLLMType">—</div>
+        </div>
     </section>
 
     <!-- Detail cards -->
     <section class="section-grid">
-      <!-- OpenDC Results -->
-      <div class="card glass lift">
-        <h3>📈 OpenDC Results for LLM settings</h3>
-        <div class="ui-only">
-          <div class="kv">
-            <div><span>Energy (kWh)</span><strong id="kvEnergy">—</strong></div>
-            <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
-            <div><span>Runtime (h)</span><strong id="kvRuntime">—</strong></div>
-            <div><span>Max Power (W)</span><strong id="kvMaxPower">—</strong></div>
-            <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
-          </div>
+        <!-- OpenDC Results -->
+        <div class="card glass lift">
+            <h3>📈 OpenDC Results for LLM settings</h3>
+            <div class="ui-only">
+                <div class="kv">
+                    <div><span>Energy (kWh)</span><strong id="kvEnergy">—</strong></div>
+                    <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
+                    <div><span>Runtime (h)</span><strong id="kvRuntime">—</strong></div>
+                    <div><span>Max Power (W)</span><strong id="kvMaxPower">—</strong></div>
+                    <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
+                </div>
 
-          <div class="kv">
-            <div class="input-group">
-              <span>Energy</span>
-              <div class="pill-input">
-                <input type="number" id="energy_input" class="pill-field" placeholder="10" min="0" step="1">
-              </div>
-            </div>
+                <div class="kv">
+                    <div class="input-group">
+                        <span>Energy</span>
+                        <div class="pill-input">
+                            <input type="number" id="energy_input" class="pill-field" placeholder="10" min="0" step="1">
+                        </div>
+                    </div>
 
-            <div class="input-group">
-              <span>Runtime</span>
-              <div class="pill-input">
-                <input type="number" id="runtime_input" class="pill-field" placeholder="2" min="0" step="1">
-              </div>
-            </div>
+                    <div class="input-group">
+                        <span>Runtime</span>
+                        <div class="pill-input">
+                            <input type="number" id="runtime_input" class="pill-field" placeholder="2" min="0" step="1">
+                        </div>
+                    </div>
 
-            <div class="rec-actions">
-              <button id="submit_slo" class="btn btn-primary" onclick="submitSLO()">Submit</button>
+                    <div class="rec-actions">
+                        <button id="submit_slo" class="btn btn-primary" onclick="submitSLO()">Submit</button>
+                    </div>
+                </div>
             </div>
-          </div>
+            <pre class="json-only" id="simJSON">null</pre>
         </div>
-        <pre class="json-only" id="simJSON">null</pre>
-      </div>
 
-      <!-- LLM Optimization -->
-      <div class="card glass lift">
-        <h3>🤖 LLM Optimization</h3>
-        <div class="ui-only">
-          <div class="kv">
-            <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
-            <div><span>Reason</span><span id="kvLLMReason">—</span></div>
-            <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
-            <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
-          </div>
+        <!-- LLM Optimization -->
+        <div class="card glass lift">
+            <h3>🤖 LLM Optimization</h3>
+            <div class="ui-only">
+                <div class="kv">
+                    <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
+                    <div><span>Reason</span><span id="kvLLMReason">—</span></div>
+                    <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
+                    <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
+                </div>
 
-          <div class="panel">
-            <div class="panel-title">Recommendations</div>
-            <ul id="kvLLMRecs"><li>—</li></ul>
+                <div class="panel">
+                    <div class="panel-title">Recommendations</div>
+                    <ul id="kvLLMRecs">
+                        <li>—</li>
+                    </ul>
 
-            <div class="rec-actions">
-              <button id="btnAcceptRec" class="btn btn-success" onclick="acceptRecommendation()">
-                Accept Recommendation
-              </button>
+                    <div class="rec-actions">
+                        <button id="btnAcceptRec" class="btn btn-success" onclick="acceptRecommendation()">
+                            Accept Recommendation
+                        </button>
+                    </div>
+                </div>
             </div>
-          </div>
+            <pre class="json-only" id="llmJSON">null</pre>
         </div>
-        <pre class="json-only" id="llmJSON">null</pre>
-      </div>
     </section>
 
     <!-- Topology -->
     <section class="card glass lift">
-      <h3>🗺️ Current Topology</h3>
-      <div class="ui-only">
-        <table id="topoTable">
-          <thead>
-            <tr>
-              <th>Cluster</th>
-              <th>Host</th>
-              <th>Count</th>
-              <th>Cores</th>
-              <th>Clock (MHz)</th>
-              <th>Memory (GiB)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td colspan="6">No topology</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <pre class="json-only" id="topologyJSON">null</pre>
+        <h3>🗺️ Current Topology</h3>
+        <div class="ui-only">
+            <table id="topoTable">
+                <thead>
+                <tr>
+                    <th>Cluster</th>
+                    <th>Host</th>
+                    <th>Count</th>
+                    <th>Cores</th>
+                    <th>Clock (MHz)</th>
+                    <th>Memory (GiB)</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td colspan="6">No topology</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <pre class="json-only" id="topologyJSON">null</pre>
     </section>
 
     <!-- Best Config -->
     <section class="card glass lift">
-      <h3>🏅 Best Configuration</h3>
-      <div class="ui-only"><div id="bestScore" class="badge">Score: —</div></div>
-      <pre class="json-only" id="bestJSON">null</pre>
+        <h3>🏅 Best Configuration</h3>
+        <div class="ui-only">
+            <div id="bestScore" class="badge">Score: —</div>
+        </div>
+        <pre class="json-only" id="bestJSON">null</pre>
     </section>
 
     <!-- Charts -->
     <div class="card glass lift">
-      <h3>CPU — Real vs Sim</h3>
+        <h3>CPU — Real vs Sim</h3>
 
-      <!-- chart toolbar -->
-      <div class="chart-toolbar">
-        <span class="hint">drag to zoom · double-click to reset</span>
-      </div>
+        <!-- chart toolbar -->
+        <div class="chart-toolbar">
+            <span class="hint">drag to zoom · double-click to reset</span>
+        </div>
 
-      <div id="chart-cpu" class="chart"></div>
+        <div id="chart-cpu" class="chart"></div>
     </div>
 
     <div class="card glass lift">
-      <h3>Power — Real vs Sim</h3>
-      <div class="chart-toolbar">
-        <span class="hint">drag to zoom · double-click to reset</span>
-      </div>
-      <div id="chart-power" class="chart"></div>
+        <h3>Power — Real vs Sim</h3>
+        <div class="chart-toolbar">
+            <span class="hint">drag to zoom · double-click to reset</span>
+        </div>
+        <div id="chart-power" class="chart"></div>
     </div>
 
     <div class="card glass lift">
-      <h3>Cumulative Energy (kWh)</h3>
-      <div class="chart-toolbar">
-        <span class="hint">drag to zoom · double-click to reset</span>
-      </div>
-      <div id="chart-energy" class="chart"></div>
+        <h3>Cumulative Energy (kWh)</h3>
+        <div class="chart-toolbar">
+            <span class="hint">drag to zoom · double-click to reset</span>
+        </div>
+        <div id="chart-energy" class="chart"></div>
     </div>
-  </div> <!-- /.container -->
+</div> <!-- /.container -->
 
-  <!-- JS (load once, after Plotly) -->
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-  <script src="{{ url_for('static', filename='index.js') }}"></script>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/ui.js"></script>
+<script src="/static/js/render.js"></script>
+<script src="/static/js/plotly_config.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/polling.js"></script>
+<script src="/static/js/boot.js"></script>
+
 </body>
 </html>
