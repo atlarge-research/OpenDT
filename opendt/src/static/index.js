@@ -204,8 +204,7 @@ async function submitSLO() {
   try {
     const energy = parseFloat(document.getElementById('energy_input').value);
     const runtime = parseFloat(document.getElementById('runtime_input').value);
-    
-    // Validate inputs
+
     if (isNaN(energy) || isNaN(runtime)) {
       console.error('Invalid input values');
       btn.classList.add('btn-danger');
@@ -216,49 +215,205 @@ async function submitSLO() {
       return;
     }
 
-    // Disable button and store class
     btn.disabled = true;
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-ghost');
 
-    const response = await fetch('/api/set_slo', {
+    // send SLO to backend (adjust endpoint/body to your API if needed)
+    await fetch('/api/submit_slo', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        energy_target: energy,
-        runtime_target: runtime
-      })
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ energy, runtime })
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    // Update pill sigils
-    const energySigil = document.querySelector('#energy_input').closest('.pill-input').querySelector('.pill-sigil');
-    const runtimeSigil = document.querySelector('#runtime_input').closest('.pill-input').querySelector('.pill-sigil');
-    if (energySigil) energySigil.textContent = fmt(energy, 2);
-    if (runtimeSigil) runtimeSigil.textContent = fmt(runtime, 1);
-
-    // Success feedback
-    btn.classList.remove('btn-ghost');
-    btn.classList.add('btn-success');
-    setTimeout(() => {
-      btn.classList.remove('btn-success');
-      btn.classList.add('btn-primary');
-    }, 1000);
-
-  } catch (error) {
-    console.error('Failed to submit SLO:', error);
-    btn.classList.remove('btn-ghost');
-    btn.classList.add('btn-danger');
-    setTimeout(() => {
-      btn.classList.remove('btn-danger');
-      btn.classList.add('btn-primary');
-    }, 1000);
+    // refresh UI after submit
+    await poll();
+  } catch(e) {
+    console.error('Failed to submit SLO:', e);
   } finally {
-    btn.disabled = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('btn-ghost');
+      btn.classList.add('btn-primary');
+    }
   }
 }
+
+
+// ===== Plotly config & layout =====
+const PLOTLY_CONFIG = {
+  responsive: true,
+  displaylogo: false,
+  displayModeBar: 'hover',    // <— show only on hover
+  modeBarButtonsToRemove: ['lasso2d','select2d','autoScale2d','toggleSpikelines'],
+  toImageButtonOptions: { format: 'png', filename: 'opendt-chart', height: 720, width: 1280, scale: 2 }
+};
+
+
+// Keep zoom/selection when re-rendering
+let UIREVISION = 'persist-zoom';
+
+// Decide if x looks like real timestamps (very loose check)
+function looksLikeDates(arr) {
+  if (!arr || !arr.length) return false;
+  const v = arr[0];
+  return typeof v === 'string' && /\d{4}-\d{2}-\d{2}.*\d{2}:\d{2}/.test(v);
+}
+
+
+// Colors (match your theme)
+const COLORS = {
+  real: '#56B4E9',
+  sim:  '#D55E00',
+  grid: 'rgba(255,255,255,0.12)'
+};
+
+// Build layout with optional date features
+function layoutFor(title) {
+  return {
+    title,
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor:  'rgba(0,0,0,0)',
+    margin: { l: 60, r: 140, t: 80, b: 80 },   // extra right room for legend
+    font: { color: 'rgba(236,240,241,0.9)' },
+
+    legend: {
+      x: 1.02, y: 1, xanchor: 'left', yanchor: 'top',
+      bgcolor: 'rgba(0,0,0,0)', bordercolor: 'rgba(255,255,255,0.08)',
+      borderwidth: 0, orientation: 'v', font: { size: 13 }
+    },
+
+    xaxis: {
+      title: 'Time',
+      type: 'date',
+      gridcolor: COLORS.grid,
+      zeroline: false,
+
+      // Put the quick range buttons back to the left, above the plot
+      rangeselector: {
+        x: 0.02, xanchor: 'left', y: 1.15, yanchor: 'top',
+        buttons: [
+          { step: 'minute', stepmode: 'backward', count: 30, label: '30m' },
+          { step: 'hour',   stepmode: 'backward', count: 2,  label: '2h' },
+          { step: 'day',    stepmode: 'backward', count: 1,  label: '1d' },
+          { step: 'all', label: 'All' },
+        ],
+        bgcolor: 'rgba(255,255,255,0.08)',
+        activecolor: 'rgba(255,255,255,0.20)',
+        bordercolor: 'rgba(255,255,255,0.10)',
+        font: { color: 'rgba(236,240,241,0.92)' }
+      },
+
+      rangeslider: { visible: true, bgcolor: 'rgba(255,255,255,0.05)' }
+    },
+
+    yaxis: {
+      gridcolor: COLORS.grid,
+      zeroline: false
+    }
+  };
+}
+
+
+// ===== Draw charts with real + sim (if present) =====
+async function fetchTS() {
+  const r = await fetch('/api/sim/timeseries', { cache: 'no-store' });
+  if (!r.ok) throw new Error('timeseries fetch failed');
+  return r.json();
+}
+
+async function drawCharts(){
+  const d = await fetchTS();
+  if(d.status !== 'ok') return;
+
+  // CPU
+  {
+    const traces = [];
+    if (d.host) {
+      traces.push({
+        x: d.host.x,
+        y: d.host.cpu_utilization,
+        mode: 'lines',
+        name: 'Real CPU (%)',
+        line: { color: COLORS.real, width: 2 }
+      });
+    }
+    if (d.host_sim) {
+      traces.push({
+        x: d.host_sim.x,
+        y: d.host_sim.cpu_utilization,
+        mode: 'lines',
+        name: 'Sim CPU (%)',
+        line: { color: COLORS.sim, width: 2, dash: 'dash' }
+      });
+    }
+    Plotly.react('chart-cpu', traces, layoutFor('CPU Utilization — Real vs Sim'), PLOTLY_CONFIG);
+  }
+
+  // Power
+  {
+    const traces = [];
+    if (d.power) {
+      traces.push({
+        x: d.power.x,
+        y: d.power.power_draw,
+        mode: 'lines',
+        name: 'Real Power (W)',
+        line: { color: COLORS.real, width: 2 }
+      });
+    }
+    if (d.power_sim) {
+      traces.push({
+        x: d.power_sim.x,
+        y: d.power_sim.power_draw,
+        mode: 'lines',
+        name: 'Sim Power (W)',
+        line: { color: COLORS.sim, width: 2, dash: 'dash' }
+      });
+    }
+    Plotly.react('chart-power', traces, layoutFor('Power — Real vs Sim'), PLOTLY_CONFIG);
+  }
+
+  // Cumulative Energy
+  {
+    const traces = [];
+    if (d.power) {
+      traces.push({
+        x: d.power.x,
+        y: d.power.energy_kwh_cum,
+        mode: 'lines',
+        name: 'Real Cumulative (kWh)',
+        line: { color: COLORS.real, width: 2 }
+      });
+    }
+    if (d.power_sim) {
+      traces.push({
+        x: d.power_sim.x,
+        y: d.power_sim.energy_kwh_cum,
+        mode: 'lines',
+        name: 'Sim Cumulative (kWh)',
+        line: { color: COLORS.sim, width: 2, dash: 'dash' }
+      });
+    }
+    Plotly.react('chart-energy', traces, layoutFor('Cumulative Energy — Real vs Sim'), PLOTLY_CONFIG);
+  }
+
+}
+
+// Optional SSE refresh (if your backend emits it)
+function startSse(){
+  try{
+    const es = new EventSource('/api/stream');
+    es.onmessage = () => drawCharts();
+    es.onerror = () => es.close();
+  }catch(_){}
+}
+
+// Boot
+document.addEventListener('DOMContentLoaded', ()=>{
+  drawCharts();
+  startSse();
+  // safety poll every 5s
+  setInterval(()=>{ drawCharts().catch(()=>{}); }, 5000);
+});
+

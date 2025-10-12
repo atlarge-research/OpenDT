@@ -538,3 +538,148 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 .input-group {
   margin-top: 1.5rem;
 }
+
+/* --- CHARTS (clean, responsive) --- */
+
+/* one-column stack, same spacing as other sections */
+.section-stack{
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  margin-bottom:22px;
+  width:100%;
+}
+
+/* chart cards fill the width */
+.section-stack .card{
+  width:100%;
+  border-radius: var(--r-lg);
+  padding:18px;
+}
+
+/* Plot container sizing */
+.chart-wrap{ width:100%; }
+.chart{
+  width:100%;
+  min-height:360px;
+}
+
+/* Force Plotly internals to be fluid */
+.plotly,
+.plot-container,
+.plotly-graph-div{
+  width:100% !important;
+  height:100% !important;
+}
+
+/* Optional: nicer modebar look */
+.plotly .modebar { background: transparent; }
+.plotly .modebar-btn svg { fill: #cbd5e1 !important; }
+.plotly .modebar-btn:hover svg,
+.plotly .modebar-btn.active svg { fill: #22d3ee !important; }
+.plotly .modebar-btn:hover {
+  background: rgba(255,255,255,0.08) !important;
+  border-radius: 8px;
+}
+
+.chart-toolbar{
+  display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem;
+}
+.chart-toolbar .btn-ghost{
+  padding:.4rem .8rem; border:1px solid var(--glass-border);
+  background:transparent; border-radius:.6rem; cursor:pointer;
+}
+.chart-toolbar .hint{opacity:.7; font-size:.85rem; margin-left:auto;}
+
+/* Plotly toolbar dark theme */
+:root{
+  /* tweak these to taste */
+  --plotly-modebar-bg: rgba(255,255,255,0.08);
+  --plotly-icon:        #e5e7eb;   /* slate-200 */
+  --plotly-icon-hover:  #f3f4f6;   /* gray-100 */
+  --plotly-icon-active: #22d3ee;   /* cyan/mint highlight */
+  --plotly-rs-bg:       rgba(255,255,255,0.06);
+}
+
+.js-plotly-plot .modebar{
+  background: var(--plotly-modebar-bg) !important;
+  backdrop-filter: blur(2px);
+  border-radius: 10px !important;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+  padding: 2px 4px;
+}
+
+.js-plotly-plot .modebar-btn{
+  background: transparent !important;
+  border-radius: 8px !important;
+  margin: 0 2px !important;
+}
+
+.js-plotly-plot .modebar-btn:hover{
+  background: rgba(255,255,255,0.18) !important;
+}
+
+/* recolor the glyphs */
+.js-plotly-plot .modebar-btn svg path,
+.js-plotly-plot .modebar-btn svg polygon{
+  fill: var(--plotly-icon) !important;
+}
+.js-plotly-plot .modebar-btn:hover svg path,
+.js-plotly-plot .modebar-btn:hover svg polygon{
+  fill: var(--plotly-icon-hover) !important;
+}
+.js-plotly-plot .modebar-btn.active svg path,
+.js-plotly-plot .modebar-btn.active svg polygon{
+  fill: var(--plotly-icon-active) !important;
+}
+
+/* rangeslider background */
+.js-plotly-plot .rangeslider-bg rect{
+  fill: var(--plotly-rs-bg) !important;
+}
+
+
+
+/* Minimal, non-intrusive modebar styling */
+.js-plotly-plot .modebar { background: transparent; }
+.js-plotly-plot .modebar-btn svg path,
+.js-plotly-plot .modebar-btn svg polygon { fill: #cbd5e1 !important; }
+.js-plotly-plot .modebar-btn:hover { background: rgba(255,255,255,0.08) !important; border-radius: 8px; }
+
+/* ---- Plotly modebar: kill light blue hover/active ---- */
+.js-plotly-plot .modebar { background: transparent !important; }
+
+/* group container background */
+.js-plotly-plot .modebar-group {
+  background: rgba(0,0,0,0.28) !important;   /* subtle dark */
+  border-radius: 8px !important;
+}
+
+/* button states */
+.js-plotly-plot .modebar-btn { 
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.js-plotly-plot .modebar-btn:hover,
+.js-plotly-plot .modebar-btn:focus,
+.js-plotly-plot .modebar-btn.active {
+  background: rgba(255,255,255,0.08) !important;  /* NOT blue */
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* icon color (SVG paths & polygons) */
+.js-plotly-plot .modebar-btn svg path,
+.js-plotly-plot .modebar-btn svg polygon {
+  fill: #d1d5db !important;    /* light gray icon */
+  stroke: none !important;
+}
+.js-plotly-plot .modebar-btn:hover svg path,
+.js-plotly-plot .modebar-btn:hover svg polygon,
+.js-plotly-plot .modebar-btn.active svg path,
+.js-plotly-plot .modebar-btn.active svg polygon {
+  fill: #f8fafc !important;    /* a bit brighter on hover */
+}
+
+/* remove any browser focus ring */
+.js-plotly-plot .modebar-btn:focus-visible { outline: none !important; }
