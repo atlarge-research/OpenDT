@@ -702,7 +702,7 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 }
 
 /* inline label + value styling */
-.slo-item{ display:flex; align-items:center; gap:10px; }
+.slo-item{ display:flex; align-items:center; gap:1px; }
 .slo-item label{
   font-size:12px; font-weight:800; letter-spacing:.02em;
   color: var(--ink-muted);
@@ -761,8 +761,64 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
   }
 }
 
-.controls .slo-combo::before{
-  content:""; width:6px; height:6px; border-radius:999px; margin-right:6px;
-  background: color-mix(in srgb, var(--blue) 70%, #00b5e2 30%);
-  box-shadow: 0 0 0 3px rgba(0,123,255,.08);
+
+
+
+/* states */
+.slo-combo.ok{
+  border-color: color-mix(in srgb, var(--green) 50%, #fff 50%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 12px 26px rgba(0,0,0,.22),
+              0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent);
 }
+.slo-combo.bad{
+  border-color: color-mix(in srgb, var(--red) 50%, #fff 50%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 12px 26px rgba(0,0,0,.22),
+              0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);
+}
+
+/* the tiny dot at the start reflects state */
+.slo-combo::before{ content:""; width:6px; height:6px; border-radius:999px; margin-right:6px; background:#aaa; }
+.slo-combo.ok::before  { background: var(--green); box-shadow: 0 0 0 3px rgba(52,199,89,.18); }
+.slo-combo.bad::before { background: var(--red);   box-shadow: 0 0 0 3px rgba(255,59,48,.18); }
+
+/* read-only score chip that matches .slo-inline-field look */
+.score-value{
+  display:inline-block;
+  min-width:84px;
+  padding:6px 12px;
+  border-radius:999px;
+  background: rgba(255,255,255,.75);
+  color: var(--ink);
+  font-size:13px;
+  font-weight:800;
+  line-height:1;
+  text-align:center;
+  box-shadow: 0 1px 0 rgba(255,255,255,.45) inset;
+}
+@media (prefers-color-scheme: dark){
+  .score-value{
+    background: rgba(255,255,255,.10);
+    color: var(--ink);
+    box-shadow: 0 1px 0 rgba(255,255,255,.06) inset;
+  }
+}
+
+/* Compact width for Energy and Runtime inputs in the controls bar */
+#energy_input.slo-inline-field,
+#runtime_input.slo-inline-field{
+  width:56px;           /* was 84px */
+  padding:6px 10px;     /* keep pill feel while tighter */
+  text-align:center;    /* keep values readable in the narrow chip */
+}
+
+
+.controls .slo-combo::before{
+  content: none !important;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+}
+
+.controls .slo-combo{ padding-left: 8px; }
+

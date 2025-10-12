@@ -77,9 +77,12 @@ function renderTopoTable(topo){
 
 function renderBest(best){
   const badge = $('#bestScore');
+
+  // round the score to no decimal, but just full number, say 30, 21
   if (badge){
     if (best && best.score !== undefined && best.score !== null){
-      badge.textContent = `Score: ${Number(best.score).toFixed(2)}`;
+      badge.textContent = `Score: ${Number(best.score).toFixed(0)}`;
+
     } else {
       badge.textContent = 'Score: —';
     }

@@ -31,7 +31,7 @@
 
             <div id="statusPill" class="status stopped">
                 <span class="dot"></span>
-                <strong>Status:</strong>
+                <strong></strong>
                 <span id="statusText">STOPPED</span>
             </div>
 
@@ -46,21 +46,24 @@
 
             <div class="slo-combo" id="sloCombo">
                 <div class="slo-item">
-                    <label for="energy_input">Energy</label>
-                    <input type="number" id="energy_input" class="slo-inline-field" placeholder="10KWh" min="0" step="1">
+                    <label for="energy_input">Energy [kWh]</label>
+                    <input type="number" id="energy_input" class="slo-inline-field" placeholder="10" min="0" step="1">
                 </div>
             </div>
 
             <div class="slo-combo" id="sloCombo">
                 <div class="slo-item">
-                    <label for="runtime_input">Runtime</label>
-                    <input type="number" id="runtime_input" class="slo-inline-field" placeholder="1h" min="0.01" step="1">
+                    <label for="runtime_input">Runtime [h] </label>
+                    <input type="number" id="runtime_input" class="slo-inline-field" placeholder="1" min="0.01" step="1">
                 </div>
             </div>
 
-
-{#            <span class="slo-divider" aria-hidden="true"></span>#}
-
+            <div class="slo-combo" id="sloCombo">
+                <div class="slo-item">
+                    <label></label>
+                    <span id="bestScore" class="score-value">—</span>
+                </div>
+            </div>
 
         </div>
     </section>
@@ -100,7 +103,7 @@
         <div class="metric glass lift sheen">
             <h3><span class="icon" style="--icon-url:var(--sym-clock)"></span>&nbsp;RUNTIME</h3>
             <div id="mRuntime" class="value">—</div>
-            <div class="meta">Simulation Time</div>
+            <div class="meta">Execution tim Time</div>
         </div>
 
         <div class="metric glass lift sheen">
@@ -123,10 +126,10 @@
             <h3>📈 OpenDC Results for LLM settings</h3>
             <div class="ui-only">
                 <div class="kv">
-                    <div><span>Energy (kWh)</span><strong id="kvEnergy">—</strong></div>
+                    <div><span>Energy [kWh]</span><strong id="kvEnergy">—</strong></div>
                     <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
-                    <div><span>Runtime (h)</span><strong id="kvRuntime">—</strong></div>
-                    <div><span>Max Power (W)</span><strong id="kvMaxPower">—</strong></div>
+                    <div><span>Runtime [h]</span><strong id="kvRuntime">—</strong></div>
+                    <div><span>Max Power [W]</span><strong id="kvMaxPower">—</strong></div>
                     <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
                 </div>
             </div>
@@ -187,13 +190,13 @@
     </section>
 
     <!-- Best Config -->
-    <section class="card glass lift">
-        <h3>🏅 Best Configuration</h3>
-        <div class="ui-only">
-            <div id="bestScore" class="badge">Score: —</div>
-        </div>
-        <pre class="json-only" id="bestJSON">null</pre>
-    </section>
+{#    <section class="card glass lift">#}
+{#        <h3>🏅 Best Configuration</h3>#}
+{#        <div class="ui-only">#}
+{#            <div id="bestScore" class="badge">Score: —</div>#}
+{#        </div>#}
+{#        <pre class="json-only" id="bestJSON">null</pre>#}
+{#    </section>#}
 
     <!-- Charts -->
     <div class="card glass lift">
@@ -233,6 +236,10 @@
 <script src="/static/js/charts.js"></script>
 <script src="/static/js/polling.js"></script>
 <script src="/static/js/boot.js"></script>
+
+<script>
+    document.body.classList.add('dense-ui');
+</script>
 
 </body>
 </html>
