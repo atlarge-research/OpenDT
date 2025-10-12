@@ -5,24 +5,13 @@
       "hosts": [
         {
           "name": "H01",
-          "count": 2,
+          "count": 277,
           "cpu": {
-            "coreCount": 64,
-            "coreSpeed": 2800
+            "coreCount": 48,
+            "coreSpeed": 2100
           },
           "memory": {
-            "memorySize": 34359738368
-          }
-        },
-        {
-          "name": "H02",
-          "count": 3,
-          "cpu": {
-            "coreCount": 24,
-            "coreSpeed": 1800
-          },
-          "memory": {
-            "memorySize": 34359738368
+            "memorySize": 210453397504
           }
         }
       ]
