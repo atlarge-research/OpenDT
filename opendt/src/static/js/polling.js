@@ -24,4 +24,3 @@ async function poll(){
 }
 window.poll = poll;
 
-z

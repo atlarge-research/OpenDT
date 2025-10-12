@@ -1,63 +1,51 @@
 // plotly_config.js
-
-// ===== Plotly config & layout =====
 const PLOTLY_CONFIG = {
   responsive: true,
   displaylogo: false,
-  displayModeBar: 'hover',
-  modeBarButtonsToRemove: ['lasso2d','select2d','autoScale2d','toggleSpikelines'],
-  toImageButtonOptions: { format: 'png', filename: 'opendt-chart', height: 720, width: 1280, scale: 2 }
+  displayModeBar: false,
+  showTips: false,
+  toImageButtonOptions: { format:'png', filename:'opendt-chart', height:720, width:1280, scale:2 }
 };
 
-// Keep zoom/selection when re-rendering
+// Theme (auto: body has .mode-json for dark)
+function getPlotTheme() {
+  const dark = document.body.classList.contains('mode-json') ||
+               window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return dark
+    ? { primary:'#ff7f0e', grid:'rgba(255,255,255,0.15)', axis:'#9ca3af', font:'#e5e7eb' }
+    : { primary:'#ff7f0e', grid:'rgba(0,0,0,0.08)',  axis:'#94a3b8', font:'#334155' };
+}
+
+// Keep zoom on re-render
 let UIREVISION = 'persist-zoom';
 
-// Colors (match your theme)
-const COLORS = {
-  real: '#56B4E9',
-  sim:  '#D55E00',
-  grid: 'rgba(255,255,255,0.12)'
-};
-
-// Build layout with optional date features
 function layoutFor(title, opts = {}) {
-  const { yTickformat = null } = opts;
+  const { yTickformat = null, yAxisTitle = null, yRange = null } = opts;
+  const t = getPlotTheme();
   return {
     title,
     uirevision: UIREVISION,
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor:  'rgba(0,0,0,0)',
-    margin: { l: 70, r: 140, t: 60, b: 70 },
-    font: { color: 'rgba(236,240,241,0.95)' },
-
-    legend: {
-      x: 1.02, y: 1, xanchor: 'left', yanchor: 'top',
-      bgcolor: 'rgba(0,0,0,0)'
-    },
-
+    margin: { l: 70, r: 40, t: 60, b: 70 },
+    font: { color: t.font, family: 'Arial, sans-serif' },
+    showlegend: false,
     xaxis: {
       title: { text: 'Time', standoff: 8 },
       type: 'date',
-      showgrid: true, gridcolor: COLORS.grid,
-      showline: true, linecolor: '#cbd5e1', linewidth: 1.2,
-      ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 6,
-      rangeslider: { visible: true, bgcolor: 'rgba(255,255,255,0.05)' },
-      rangeselector: {
-        x: 0.02, xanchor: 'left', y: 1.15, yanchor: 'top',
-        buttons: [
-          { step: 'minute', stepmode: 'backward', count: 30, label: '30m' },
-          { step: 'hour',   stepmode: 'backward', count: 2,  label: '2h' },
-          { step: 'day',    stepmode: 'backward', count: 1,  label: '1d' },
-          { step: 'all', label: 'All' },
-        ]
-      }
+      showgrid: true,  gridcolor: t.grid,
+      showline: true,  linecolor: t.axis, linewidth: 1.2,
+      ticks: 'outside', tickcolor: t.axis, ticklen: 6,
+      rangeslider: { visible: false }
     },
-
     yaxis: {
-      showgrid: true, gridcolor: COLORS.grid,
-      showline: true, linecolor: '#cbd5e1', linewidth: 1.2,
-      ticks: 'outside', tickcolor: '#cbd5e1', ticklen: 6,
-      tickformat: yTickformat || undefined
+      title: { text: yAxisTitle || '', standoff: 8 },
+      showgrid: true,  gridcolor: t.grid,
+      showline: true,  linecolor: t.axis, linewidth: 1.2,
+      ticks: 'outside', tickcolor: t.axis, ticklen: 6,
+      tickformat: yTickformat || undefined,
+      rangemode: 'tozero',
+      range: yRange || undefined
     }
   };
 }

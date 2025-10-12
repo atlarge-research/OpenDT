@@ -14,6 +14,7 @@ function setMode(mode){
   $('#btnModeUI')?.classList.toggle('active', mode === 'ui');
   $('#btnModeJSON')?.classList.toggle('active', mode === 'json');
   localStorage.setItem(modeKey, mode);
+  if (window.drawCharts) window.drawCharts();   // <- refresh with new theme
 }
 window.setMode = setMode;
 

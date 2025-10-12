@@ -683,3 +683,5 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 
 /* remove any browser focus ring */
 .js-plotly-plot .modebar-btn:focus-visible { outline: none !important; }
+
+.plotly-notifier { display: none !important; }
