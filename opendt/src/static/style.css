@@ -75,7 +75,7 @@ body{
     linear-gradient(180deg, var(--bg-1), var(--bg-2));
   background-attachment:fixed;
 }
-.container{max-width:1200px;margin:0 auto;padding:28px}
+.container{max-width:1440px;margin:0 auto;padding:28px}
 
 /* 2) Liquid glass primitives */
 .glass{
@@ -224,7 +224,7 @@ body{
 .seg button.active{background:var(--surface-strong); border:1px solid var(--hairline); box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
 
 /* 7) Metrics & cards */
-.metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px; margin:20px 0}
+.metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px; margin:20px 0; grid-template-columns: repeat(6, 1fr)}
 .metric{border-radius:18px; padding:18px; position:relative}
 .metric h3{margin:0 0 6px; font-size:12px; letter-spacing:.08em; color:var(--ink-muted); display:flex; align-items:center; gap:6px}
 .metric .value{font-size:28px; font-weight:900}
@@ -683,3 +683,278 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 
 /* remove any browser focus ring */
 .js-plotly-plot .modebar-btn:focus-visible { outline: none !important; }
+
+.plotly-notifier { display: none !important; }
+
+/* --- SLO pill: glass gradient + soft shadow to match controls --- */
+.controls .slo-combo{
+  display:flex; align-items:center; gap:14px; padding:10px 14px;
+  border-radius:999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 92%, transparent) 0%, transparent 100%),
+    var(--surface-weak);
+  border:1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.45) inset,
+    0 10px 24px rgba(16,18,27,.10);
+}
+
+/* inline label + value styling */
+.slo-item{ display:flex; align-items:center; gap:1px; }
+.slo-item label{
+  font-size:12px; font-weight:800; letter-spacing:.02em;
+  color: var(--ink-muted);
+}
+
+/* value chip look for inputs (like other counters) */
+.slo-inline-field{
+  width:84px; padding:6px 12px; border:0; border-radius:999px;
+  background: rgba(255,255,255,.75);
+  color: var(--ink); font-size:13px; font-weight:800; outline:none;
+  box-shadow: 0 1px 0 rgba(255,255,255,.45) inset;
+  transition: background var(--dur-quick) var(--ease-spring), box-shadow var(--dur-quick);
+}
+.slo-inline-field::placeholder{ color: color-mix(in srgb, var(--ink-muted) 80%, transparent); }
+
+/* focus = subtle blue glow to match primary */
+.slo-inline-field:focus{
+  background: var(--surface-strong);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--blue) 22%, transparent),
+    0 1px 0 rgba(255,255,255,.5) inset;
+}
+
+/* divider tone aligned with other pills */
+.slo-divider{
+  width:1px; height:22px;
+  background: color-mix(in srgb, var(--glass-border) 80%, #fff 20%);
+  border-radius:1px;
+}
+
+/* hover polish consistent with controls */
+.controls .slo-combo:hover{
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.45) inset,
+    0 14px 30px rgba(16,18,27,.14);
+}
+
+/* dark mode tune */
+@media (prefers-color-scheme: dark){
+  .controls .slo-combo{
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.06), transparent),
+      var(--surface-weak);
+    border-color: var(--glass-border);
+  }
+  .slo-inline-field{
+    background: rgba(255,255,255,.10);
+    color: var(--ink);
+    box-shadow: 0 1px 0 rgba(255,255,255,.06) inset;
+  }
+  .slo-inline-field:focus{
+    background: rgba(255,255,255,.16);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--blue) 30%, transparent),
+      0 1px 0 rgba(255,255,255,.08) inset;
+  }
+}
+
+
+
+
+/* states */
+.slo-combo.ok{
+  border-color: color-mix(in srgb, var(--green) 50%, #fff 50%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 12px 26px rgba(0,0,0,.22),
+              0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent);
+}
+.slo-combo.bad{
+  border-color: color-mix(in srgb, var(--red) 50%, #fff 50%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 12px 26px rgba(0,0,0,.22),
+              0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);
+}
+
+/* the tiny dot at the start reflects state */
+.slo-combo::before{ content:""; width:6px; height:6px; border-radius:999px; margin-right:6px; background:#aaa; }
+.slo-combo.ok::before  { background: var(--green); box-shadow: 0 0 0 3px rgba(52,199,89,.18); }
+.slo-combo.bad::before { background: var(--red);   box-shadow: 0 0 0 3px rgba(255,59,48,.18); }
+
+/* read-only score chip that matches .slo-inline-field look */
+.score-value{
+  display:inline-block;
+  min-width:84px;
+  padding:6px 12px;
+  border-radius:999px;
+  background: rgba(255,255,255,.75);
+  color: var(--ink);
+  font-size:13px;
+  font-weight:800;
+  line-height:1;
+  text-align:center;
+  box-shadow: 0 1px 0 rgba(255,255,255,.45) inset;
+}
+@media (prefers-color-scheme: dark){
+  .score-value{
+    background: rgba(255,255,255,.10);
+    color: var(--ink);
+    box-shadow: 0 1px 0 rgba(255,255,255,.06) inset;
+  }
+}
+
+/* Compact width for Energy and Runtime inputs in the controls bar */
+#energy_input.slo-inline-field,
+#runtime_input.slo-inline-field{
+  width:56px;           /* was 84px */
+  padding:6px 10px;     /* keep pill feel while tighter */
+  text-align:center;    /* keep values readable in the narrow chip */
+}
+
+
+.controls .slo-combo::before{
+  content: none !important;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+}
+
+.controls .slo-combo{ padding-left: 8px; }
+
+/* Two-column layout for results + charts */
+.section-columns {
+  display: grid;
+  grid-template-columns: 0.9fr 1.6fr;
+  gap: var(--gap, 1rem);
+  align-items: start;
+}
+
+/* Stack on small screens */
+@media (max-width: 900px) {
+  .section-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Add consistent space after the Current Topology card */
+.card > #topoTable,
+.card > #topologyJSON {
+  /* Ensure these selectors target the topology card only */
+}
+.card h3:contains("Current Topology") {
+  /* This selector is not supported in pure CSS, so use the card itself */
+}
+/* Solution: target the first .card after .metrics for spacing */
+.card {
+  /* ...existing card styles... */
+  /* Add margin-bottom for spacing after topology card */
+  margin-bottom: 32px;
+}
+
+/* Remove extra margin for other cards to avoid double spacing */
+.section-columns .card {
+  margin-bottom: 0;
+}
+.section-stack .card {
+  margin-bottom: 0;
+}
+
+/* Normalize LLM feedback and priority styling */
+.llm-feedback-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.llm-feedback-section h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.feedback-value {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 0.875rem;
+    color: #374151;
+    display: inline-block;
+    min-width: 3rem;
+    text-align: center;
+}
+
+.priority-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.priority-section h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.priority-value {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 0.875rem;
+    color: #374151;
+    display: inline-block;
+    min-width: 4rem;
+    text-align: center;
+}
+
+/* Action type styling */
+.action-value {
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    display: inline-block;
+    font-size: 0.875rem;
+}
+
+.action-upscale {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.action-slightly-upscale {
+    background: #fef7cd;
+    color: #a16207;
+}
+
+.action-downscale {
+    background: #fecaca;
+    color: #b91c1c;
+}
+
+.action-slightly-downscale {
+    background: #fed7d7;
+    color: #c53030;
+}
+
+.action-maintain {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+/* Remove the blue background from existing elements */
+.card .bg-light-blue {
+    background: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 0.25rem !important;
+}
+

@@ -225,8 +225,7 @@ class LLM:
                     'energy_kwh': sim_results.get('energy_kwh'),
                     'cpu_utilization': sim_results.get('cpu_utilization'),
                     'task_count': batch_data.get('task_count'),
-                    'llm_recommendations': [
-                        f"LLM optimized topology with {len(llm_result.cluster_name)} configurations"],
+                    'llm_recommendation': new_topology,
                     'priority': 'high' if sim_results.get('energy_kwh', 0) > 5 else 'medium',
                     'action_type': ['optimize'],
                     'action_taken': 'optimize',

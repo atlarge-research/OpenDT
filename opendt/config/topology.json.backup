@@ -1,0 +1,20 @@
+{
+  "clusters": [
+    {
+      "name": "C01",
+      "hosts": [
+        {
+          "name": "H01",
+          "count": 277,
+          "cpu": {
+            "coreCount": 48,
+            "coreSpeed": 2100
+          },
+          "memory": {
+            "memorySize": 210453397504
+          }
+        }
+      ]
+    }
+  ]
+}
