@@ -104,7 +104,7 @@
         <div class="metric glass lift sheen">
             <h3><span class="icon" style="--icon-url:var(--sym-clock)"></span>&nbsp;RUNTIME</h3>
             <div id="mRuntime" class="value">—</div>
-            <div class="meta">Execution sim Time</div>
+            <div class="meta">Estimated time</div>
         </div>
 
         <div class="metric glass lift sheen">
@@ -123,50 +123,10 @@
     <!-- Detail cards -->
     <section class="section-columns">
         <section class="section-stack">
-            <!-- Current Topology (moved here) -->
-            <div class="card glass lift">
-                <h3>🗺️ Current Topology</h3>
-                <div class="ui-only">
-                    <table id="topoTable">
-                        <thead>
-                        <tr>
-                            <th>Cluster</th>
-                            <th>Host</th>
-                            <th>Count</th>
-                            <th>Cores</th>
-                            <th>Clock (MHz)</th>
-                            <th>Memory (GiB)</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td colspan="6">No topology</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <pre class="json-only" id="topologyJSON">null</pre>
-            </div>
-
-            <!-- OpenDC Results -->
-            <div class="card glass lift">
-                <h3>📈 OpenDC Results for LLM settings</h3>
-                <div class="ui-only">
-                    <div class="kv">
-                        <div><span>Energy [kWh]</span><strong id="kvEnergy">—</strong></div>
-                        <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
-                        <div><span>Runtime [h]</span><strong id="kvRuntime">—</strong></div>
-                        <div><span>Max Power [W]</span><strong id="kvMaxPower">—</strong></div>
-                        <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
-                    </div>
-                </div>
-                <pre class="json-only" id="simJSON">null</pre>
-            </div>
-
             <!-- LLM Recommendation -->
             <div class="card glass lift">
                 <div class="ui-only">
-                    <h3>Topology Recommendation</h3>
+                    <h3>🤖LLM Recommendation</h3>
                     <div class="kv">
                         <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
                         <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
@@ -200,6 +160,44 @@
                 </div>
                 <pre class="json-only" id="llmJSON">null</pre>
             </div>
+
+            <div class="card glass lift">
+                <h3>🗺️ Current Topology</h3>
+                <div class="ui-only">
+                    <table id="topoTable">
+                        <thead>
+                        <tr>
+                            <th>Cluster</th>
+                            <th>Host</th>
+                            <th>Count</th>
+                            <th>Cores</th>
+                            <th>Clock (MHz)</th>
+                            <th>Memory (GiB)</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td colspan="6">No topology</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre class="json-only" id="topologyJSON">null</pre>
+            </div>
+
+            <!-- OpenDC Results -->
+            <div class="card glass lift">
+                <h3>📈LLM-Recommended Infrastructure (simulated) </h3>
+                <div class="ui-only">
+                    <div class="kv">
+                        <div><span>Energy [kWh]</span><strong id="kvEnergy">—</strong></div>
+                        <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
+                        <div><span>Runtime [h]</span><strong id="kvRuntime">—</strong></div>
+                        <div><span>LLM feedback for window</span><span id="kvSimType" class="badge">—</span></div>
+                    </div>
+                </div>
+                <pre class="json-only" id="simJSON">null</pre>
+            </div>
         </section>
         <section class="section-stack" aria-label="Charts">
             <!-- Charts (moved aside) -->
@@ -224,7 +222,7 @@
             </div>
 
             <div class="card glass lift">
-                <h3>Cumulative Energy (kWh)</h3>
+                <h3>Cumulative Energy [kWh]</h3>
                 <div class="chart-toolbar">
                     <span class="hint">drag to zoom · double-click to reset</span>
                 </div>
