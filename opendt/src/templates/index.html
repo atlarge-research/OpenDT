@@ -54,7 +54,8 @@
             <div class="slo-combo" id="sloCombo">
                 <div class="slo-item">
                     <label for="runtime_input">Runtime [h] </label>
-                    <input type="number" id="runtime_input" class="slo-inline-field" placeholder="1" min="0.01" step="1">
+                    <input type="number" id="runtime_input" class="slo-inline-field" placeholder="1" min="0.01"
+                           step="1">
                 </div>
             </div>
 
@@ -70,11 +71,11 @@
 
     <!-- Metrics -->
     <section class="metrics">
-        <div class="metric glass lift sheen">
-            <h3><span class="icon" style="--icon-url:var(--sym-chart)"></span>&nbsp;PROCESSING</h3>
-            <div id="mCycles" class="value">0</div>
-            <div class="meta">Optimization Cycles</div>
-        </div>
+{#        <div class="metric glass lift sheen">#}
+{#            <h3><span class="icon" style="--icon-url:var(--sym-chart)"></span>&nbsp;PROCESSING</h3>#}
+{#            <div id="mCycles" class="value">0</div>#}
+{#            <div class="meta">Optimization Cycles</div>#}
+{#        </div>#}
 
         <div class="metric glass lift sheen">
             <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;WORKLOAD</h3>
@@ -109,73 +110,68 @@
         <div class="metric glass lift sheen">
             <h3><span class="icon" style="--icon-url:var(--sym-topo)"></span>&nbsp;TOPOLOGY</h3>
             <div id="mTopoUpdates" class="value">0</div>
-            <div class="meta">Infrastructure Adjustment(s)</div>
+            <div class="meta">Adjustment(s)</div>
         </div>
 
-        <div class="metric glass lift sheen">
-            <h3><span class="icon" style="--icon-url:var(--sym-wand)"></span>&nbsp;LLM</h3>
-            <div id="mLLMAction" class="value">—</div>
-            <div class="meta" id="mLLMType">—</div>
-        </div>
-    </section>
-
-      <!-- Topology -->
-    <section class="card glass lift">
-        <h3>🗺️ Current Topology</h3>
-        <div class="ui-only">
-            <table id="topoTable">
-                <thead>
-                <tr>
-                    <th>Cluster</th>
-                    <th>Host</th>
-                    <th>Count</th>
-                    <th>Cores</th>
-                    <th>Clock (MHz)</th>
-                    <th>Memory (GiB)</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td colspan="6">No topology</td>
-                </tr>
-                </tbody>
-            </table>
-        </div>
-        <pre class="json-only" id="topologyJSON">null</pre>
+{#        <div class="metric glass lift sheen">#}
+{#            <h3><span class="icon" style="--icon-url:var(--sym-wand)"></span>&nbsp;LLM</h3>#}
+{#            <div id="mLLMAction" class="value">—</div>#}
+{#            <div class="meta" id="mLLMType">—</div>#}
+{#        </div>#}
     </section>
 
     <!-- Detail cards -->
     <section class="section-columns">
-<section class="section-stack">
-        <!-- OpenDC Results -->
-        <div class="card glass lift">
-            <h3>📈 OpenDC Results for LLM settings</h3>
-            <div class="ui-only">
-                <div class="kv">
-                    <div><span>Energy [kWh]</span><strong id="kvEnergy">—</strong></div>
-                    <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
-                    <div><span>Runtime [h]</span><strong id="kvRuntime">—</strong></div>
-                    <div><span>Max Power [W]</span><strong id="kvMaxPower">—</strong></div>
-                    <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
+        <section class="section-stack">
+            <!-- Current Topology (moved here) -->
+            <div class="card glass lift">
+                <h3>🗺️ Current Topology</h3>
+                <div class="ui-only">
+                    <table id="topoTable">
+                        <thead>
+                        <tr>
+                            <th>Cluster</th>
+                            <th>Host</th>
+                            <th>Count</th>
+                            <th>Cores</th>
+                            <th>Clock (MHz)</th>
+                            <th>Memory (GiB)</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td colspan="6">No topology</td>
+                        </tr>
+                        </tbody>
+                    </table>
                 </div>
+                <pre class="json-only" id="topologyJSON">null</pre>
             </div>
-            <pre class="json-only" id="simJSON">null</pre>
-        </div>
 
-        <!-- LLM Optimization -->
-        <div class="card glass lift">
-            <h3>🤖 LLM Optimization</h3>
-            <div class="ui-only">
-                <div class="kv">
-                    <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
-                    <div><span>Reason</span><span id="kvLLMReason">—</span></div>
-                    <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
-                    <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
+            <!-- OpenDC Results -->
+            <div class="card glass lift">
+                <h3>📈 OpenDC Results for LLM settings</h3>
+                <div class="ui-only">
+                    <div class="kv">
+                        <div><span>Energy [kWh]</span><strong id="kvEnergy">—</strong></div>
+                        <div><span>CPU Utilization</span><strong id="kvCPU">—</strong></div>
+                        <div><span>Runtime [h]</span><strong id="kvRuntime">—</strong></div>
+                        <div><span>Max Power [W]</span><strong id="kvMaxPower">—</strong></div>
+                        <div><span>LLM optimisation cycle</span><span id="kvSimType" class="badge">—</span></div>
+                    </div>
                 </div>
+                <pre class="json-only" id="simJSON">null</pre>
+            </div>
 
-                <div class="panel">
-                    <section class="card glass lift">
+            <!-- LLM Recommendation -->
+            <div class="card glass lift">
+                <div class="ui-only">
                     <h3>Topology Recommendation</h3>
+                    <div class="kv">
+                        <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
+                        <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
+                    </div>
+
                     <div class="ui-only">
                         <table id="recTable">
                             <thead>
@@ -196,57 +192,55 @@
                         </table>
                     </div>
                     <pre class="json-only" id="topologyJSON">null</pre>
-                </section>
                     <button id="accept-recommendation-btn"
-                        class="btn btn-success"
-                        onclick="acceptRecommendation()">
-                    Accept Recommendation
-                </button>
+                            class="btn btn-success"
+                            onclick="acceptRecommendation()">
+                        Accept Recommendation
+                    </button>
                 </div>
+                <pre class="json-only" id="llmJSON">null</pre>
             </div>
-            <pre class="json-only" id="llmJSON">null</pre>
-        </div>
+        </section>
+        <section class="section-stack" aria-label="Charts">
+            <!-- Charts (moved aside) -->
+
+            <div class="card glass lift">
+                <h3>CPU Utilization</h3>
+
+                <!-- chart toolbar -->
+                <div class="chart-toolbar">
+                    <span class="hint">drag to zoom · double-click to reset</span>
+                </div>
+
+                <div id="chart-cpu" class="chart"></div>
+            </div>
+
+            <div class="card glass lift">
+                <h3>Power</h3>
+                <div class="chart-toolbar">
+                    <span class="hint">drag to zoom · double-click to reset</span>
+                </div>
+                <div id="chart-power" class="chart"></div>
+            </div>
+
+            <div class="card glass lift">
+                <h3>Cumulative Energy (kWh)</h3>
+                <div class="chart-toolbar">
+                    <span class="hint">drag to zoom · double-click to reset</span>
+                </div>
+                <div id="chart-energy" class="chart"></div>
+            </div>
+        </section>
     </section>
-<section class="section-stack" aria-label="Charts">
-<!-- Charts (moved aside) -->
-
-    <div class="card glass lift">
-        <h3>CPU Utilization</h3>
-
-        <!-- chart toolbar -->
-        <div class="chart-toolbar">
-            <span class="hint">drag to zoom · double-click to reset</span>
-        </div>
-
-        <div id="chart-cpu" class="chart"></div>
-    </div>
-
-    <div class="card glass lift">
-        <h3>Power</h3>
-        <div class="chart-toolbar">
-            <span class="hint">drag to zoom · double-click to reset</span>
-        </div>
-        <div id="chart-power" class="chart"></div>
-    </div>
-
-    <div class="card glass lift">
-        <h3>Cumulative Energy (kWh)</h3>
-        <div class="chart-toolbar">
-            <span class="hint">drag to zoom · double-click to reset</span>
-        </div>
-        <div id="chart-energy" class="chart"></div>
-    </div>
-</section>
-</section>
 
     <!-- Best Config -->
-{#    <section class="card glass lift">#}
-{#        <h3>🏅 Best Configuration</h3>#}
-{#        <div class="ui-only">#}
-{#            <div id="bestScore" class="badge">Score: —</div>#}
-{#        </div>#}
-{#        <pre class="json-only" id="bestJSON">null</pre>#}
-{#    </section>#}</div> <!-- /.container -->
+    {#    <section class="card glass lift">#}
+    {#        <h3>🏅 Best Configuration</h3>#}
+    {#        <div class="ui-only">#}
+    {#            <div id="bestScore" class="badge">Score: —</div>#}
+    {#        </div>#}
+    {#        <pre class="json-only" id="bestJSON">null</pre>#}
+    {#    </section>#}</div> <!-- /.container -->
 
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 
@@ -264,4 +258,3 @@
 
 </body>
 </html>
-
