@@ -836,3 +836,26 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
     grid-template-columns: 1fr;
   }
 }
+
+/* Add consistent space after the Current Topology card */
+.card > #topoTable,
+.card > #topologyJSON {
+  /* Ensure these selectors target the topology card only */
+}
+.card h3:contains("Current Topology") {
+  /* This selector is not supported in pure CSS, so use the card itself */
+}
+/* Solution: target the first .card after .metrics for spacing */
+.card {
+  /* ...existing card styles... */
+  /* Add margin-bottom for spacing after topology card */
+  margin-bottom: 32px;
+}
+
+/* Remove extra margin for other cards to avoid double spacing */
+.section-columns .card {
+  margin-bottom: 0;
+}
+.section-stack .card {
+  margin-bottom: 0;
+}
