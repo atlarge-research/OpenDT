@@ -102,3 +102,4 @@ async function acceptRecommendation() {
   }
 }
 window.acceptRecommendation = acceptRecommendation;
+

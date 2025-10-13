@@ -403,6 +403,33 @@ def api_topology():
     })
 
 
+@app.route('/api/accept_recommendation', methods=['POST'])
+def api_accept_recommendation():
+    try:
+        # Get the best recommended topology from the current state
+        best_config = orchestrator.state.get('best_config')
+
+        if not best_config or 'config' not in best_config:
+            return jsonify({'error': 'No recommendation available'}), 400
+
+        recommended_topology = best_config['config']
+
+        # Update the topology.json file with the recommended configuration
+        success = orchestrator.update_topology_file(recommended_topology)
+
+        if success:
+            return jsonify({
+                'message': 'Topology updated successfully with LLM recommendation',
+                'topology_updates': orchestrator.state.get('topology_updates', 0)
+            })
+        else:
+            return jsonify({'error': 'Failed to update topology file'}), 500
+
+    except Exception as e:
+        logger.error(f"Error accepting recommendation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/reset_topology', methods=['POST'])
 def api_reset_topology():
     try:
