@@ -103,7 +103,7 @@
         <div class="metric glass lift sheen">
             <h3><span class="icon" style="--icon-url:var(--sym-clock)"></span>&nbsp;RUNTIME</h3>
             <div id="mRuntime" class="value">—</div>
-            <div class="meta">Execution tim Time</div>
+            <div class="meta">Execution sim Time</div>
         </div>
 
         <div class="metric glass lift sheen">
@@ -119,8 +119,34 @@
         </div>
     </section>
 
+      <!-- Topology -->
+    <section class="card glass lift">
+        <h3>🗺️ Current Topology</h3>
+        <div class="ui-only">
+            <table id="topoTable">
+                <thead>
+                <tr>
+                    <th>Cluster</th>
+                    <th>Host</th>
+                    <th>Count</th>
+                    <th>Cores</th>
+                    <th>Clock (MHz)</th>
+                    <th>Memory (GiB)</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td colspan="6">No topology</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <pre class="json-only" id="topologyJSON">null</pre>
+    </section>
+
     <!-- Detail cards -->
-    <section class="section-grid">
+    <section class="section-columns">
+<section class="section-stack">
         <!-- OpenDC Results -->
         <div class="card glass lift">
             <h3>📈 OpenDC Results for LLM settings</h3>
@@ -148,10 +174,29 @@
                 </div>
 
                 <div class="panel">
-                    <div class="panel-title">Recommendations</div>
-                    <ul id="kvLLMRecs">
-                        <li>—</li>
-                    </ul>
+                    <section class="card glass lift">
+                    <h3>Topology Recommendation</h3>
+                    <div class="ui-only">
+                        <table id="recTable">
+                            <thead>
+                            <tr>
+                                <th>Cluster</th>
+                                <th>Host</th>
+                                <th>Count</th>
+                                <th>Cores</th>
+                                <th>Clock (MHz)</th>
+                                <th>Memory (GiB)</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                                <td colspan="6">No topology</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <pre class="json-only" id="topologyJSON">null</pre>
+                </section>
 
                     <div class="rec-actions">
                         <button id="btnAcceptRec" class="btn btn-success" onclick="acceptRecommendation()">
@@ -163,42 +208,9 @@
             <pre class="json-only" id="llmJSON">null</pre>
         </div>
     </section>
+<section class="section-stack" aria-label="Charts">
+<!-- Charts (moved aside) -->
 
-    <!-- Topology -->
-    <section class="card glass lift">
-        <h3>🗺️ Current Topology</h3>
-        <div class="ui-only">
-            <table id="topoTable">
-                <thead>
-                <tr>
-                    <th>Cluster</th>
-                    <th>Host</th>
-                    <th>Count</th>
-                    <th>Cores</th>
-                    <th>Clock (MHz)</th>
-                    <th>Memory (GiB)</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td colspan="6">No topology</td>
-                </tr>
-                </tbody>
-            </table>
-        </div>
-        <pre class="json-only" id="topologyJSON">null</pre>
-    </section>
-
-    <!-- Best Config -->
-{#    <section class="card glass lift">#}
-{#        <h3>🏅 Best Configuration</h3>#}
-{#        <div class="ui-only">#}
-{#            <div id="bestScore" class="badge">Score: —</div>#}
-{#        </div>#}
-{#        <pre class="json-only" id="bestJSON">null</pre>#}
-{#    </section>#}
-
-    <!-- Charts -->
     <div class="card glass lift">
         <h3>CPU Utilization</h3>
 
@@ -225,7 +237,17 @@
         </div>
         <div id="chart-energy" class="chart"></div>
     </div>
-</div> <!-- /.container -->
+</section>
+</section>
+
+    <!-- Best Config -->
+{#    <section class="card glass lift">#}
+{#        <h3>🏅 Best Configuration</h3>#}
+{#        <div class="ui-only">#}
+{#            <div id="bestScore" class="badge">Score: —</div>#}
+{#        </div>#}
+{#        <pre class="json-only" id="bestJSON">null</pre>#}
+{#    </section>#}</div> <!-- /.container -->
 
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 
@@ -243,3 +265,4 @@
 
 </body>
 </html>
+

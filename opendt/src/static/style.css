@@ -75,7 +75,7 @@ body{
     linear-gradient(180deg, var(--bg-1), var(--bg-2));
   background-attachment:fixed;
 }
-.container{max-width:1200px;margin:0 auto;padding:28px}
+.container{max-width:1440px;margin:0 auto;padding:28px}
 
 /* 2) Liquid glass primitives */
 .glass{
@@ -822,3 +822,17 @@ tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
 
 .controls .slo-combo{ padding-left: 8px; }
 
+/* Two-column layout for results + charts */
+.section-columns {
+  display: grid;
+  grid-template-columns: 0.9fr 1.6fr;
+  gap: var(--gap, 1rem);
+  align-items: start;
+}
+
+/* Stack on small screens */
+@media (max-width: 900px) {
+  .section-columns {
+    grid-template-columns: 1fr;
+  }
+}

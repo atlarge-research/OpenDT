@@ -32,23 +32,8 @@ function renderOpenDC(sim,s){
   if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
-function renderLLM(opt){
-  $('#kvLLMAction')   && ($('#kvLLMAction').textContent = opt.action_taken || '—');
-  $('#kvLLMReason')   && ($('#kvLLMReason').textContent = opt.reason || '—');
-  $('#kvLLMPriority') && ($('#kvLLMPriority').textContent = opt.priority || '—');
-  $('#kvLLMType')     && ($('#kvLLMType').textContent     = (opt.type || '—').replace('_',' '));
-
-  const list = $('#kvLLMRecs');
-  const recs = opt.recommendations || opt.llm_recommendations || [];
-  if (list) list.innerHTML = recs.length ? recs.map(r=>`<li>${r}</li>`).join('') : '<li>—</li>';
-
-  const pre = $('#llmJSON');
-  const txt = JSON.stringify(opt || null, null, 2);
-  if (pre && pre.textContent !== txt) pre.textContent = txt;
-}
-
-function renderTopoTable(topo){
-  const body = $('#topoTable tbody');
+function renderTopoTable(topo, id){
+  const body = $(`#${id} tbody`);
   if (!body) return;
   const rows = [];
   try{
@@ -72,6 +57,20 @@ function renderTopoTable(topo){
 
   const pre = $('#topologyJSON');
   const txt = JSON.stringify(topo || null, null, 2);
+  if (pre && pre.textContent !== txt) pre.textContent = txt;
+}
+
+function renderLLM(opt){
+  $('#kvLLMAction')   && ($('#kvLLMAction').textContent = opt.action_taken || '—');
+  $('#kvLLMReason')   && ($('#kvLLMReason').textContent = opt.reason || '—');
+  $('#kvLLMPriority') && ($('#kvLLMPriority').textContent = opt.priority || '—');
+  $('#kvLLMType')     && ($('#kvLLMType').textContent     = (opt.type || '—').replace('_',' '));
+
+  const recs = opt.recommendations || opt.llm_recommendation || [];
+  renderTopoTable(recs, "recTable");
+
+  const pre = $('#llmJSON');
+  const txt = JSON.stringify(opt || null, null, 2);
   if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
