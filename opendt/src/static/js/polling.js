@@ -63,14 +63,12 @@ window.poll = poll;
     setInterval(refreshSLO, 2000);
   });
 
-  // Re-evaluate right after SLO inputs change (you already auto-submit)
   ['energy_input','runtime_input'].forEach(id=>{
     const n = document.getElementById(id);
     if (n) n.addEventListener('change', refreshSLO);
     if (n) n.addEventListener('input',  () => { /* debounce quick feedback */ });
   });
 
-  // If you have a global submitSLO(), hook its success (optional):
   const _submitSLO = window.submitSLO;
   if (typeof _submitSLO === 'function') {
     window.submitSLO = async function(){

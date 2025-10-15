@@ -151,6 +151,7 @@ class LLM:
             if current_topology:
                 is_new_best = self.update_best_configuration(sim_results, current_topology)
 
+            logger.info(f"Open ai key is: {self.openai_key}")
             llm = ChatOpenAI(
                 api_key=self.openai_key,
                 model="gpt-3.5-turbo",

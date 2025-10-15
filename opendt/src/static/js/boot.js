@@ -1,17 +1,12 @@
 // boot.js
 
 setMode(localStorage.getItem(modeKey) || 'ui');
-poll();
-
-// boot charts + sse and periodic refresh
-document.addEventListener('DOMContentLoaded', ()=>{
-  drawCharts();
-  startSse();
-  // safety poll every 5s
-  setInterval(()=>{ drawCharts().catch(()=>{}); }, 5000);
-});
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  init_graphs();
+  setInterval(()=>{ drawCharts().catch(()=>{}); }, 5000);
+
   const energy  = document.getElementById('energy_input');
   const runtime = document.getElementById('runtime_input');
   if (!energy || !runtime || typeof submitSLO !== 'function') return;
@@ -27,6 +22,4 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-
-// also keep status/metrics polling every 2s
 setInterval(poll, 2000);

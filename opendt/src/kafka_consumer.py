@@ -186,6 +186,8 @@ class DigitalTwinConsumer:
             'timestamp': time.time(),
             'window_number': window_number,
             'window_info': f"Window {window_number}: {task_count} tasks, {fragment_count} fragments",
+            "window_start": window["start"],
+            "window_end": window["end"],
             'tasks_sample': curr_tasks_df.to_dict(orient='records'),
             'fragments_sample': frags_df.to_dict(orient='records')
         }

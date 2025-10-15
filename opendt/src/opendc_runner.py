@@ -133,7 +133,7 @@ class OpenDCRunner:
         return str(workload_dir)
 
     # ---------- main entry: run a simulation or fall back ----------
-    def run_simulation(self, tasks_data, fragments_data, topology_data):
+    def run_simulation(self, tasks_data, fragments_data, topology_data, expName="simple"):
         """Run OpenDC; if the runner is missing/unusable, write mock outputs."""
         if not self.opendc_path:
             return self.create_enhanced_mock_results(
@@ -153,6 +153,7 @@ class OpenDCRunner:
 
             # Experiment config
             experiment = dict(self.base_experiment)
+            experiment["name"] = expName
             experiment.update({
                 "topologies": [{"pathToFile": str(topology_file)}],
                 "workloads": [{"pathToFile": workload_path, "type": "ComputeWorkload"}],
