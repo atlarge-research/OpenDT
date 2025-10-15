@@ -25,6 +25,57 @@
 \usepackage{pifont}
 \usepackage{tabularx}
 
+\usepackage[T1]{fontenc}
+\usepackage[scaled=0.85]{inconsolata} % optional mono font
+\usepackage{xcolor}
+
+\definecolor{KeywordBlue}{RGB}{0,92,197}
+\definecolor{OpRed}{RGB}{178,34,34}
+\definecolor{NumTeal}{RGB}{0,128,128}
+\definecolor{CommentGray}{gray}{0.35}
+
+\crefname{listing}{Listing}{Listings} % enables \Cref{<label>} for listings
+\lstdefinestyle{pyopendt}{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  % keep strings black
+  stringstyle=\color{black},
+  commentstyle=\color{CommentGray},
+  keywordstyle=\color{KeywordBlue},
+  % emphasize selected identifiers (pseudo-builtins in your snippet)
+  emph={json,parser,sim_results,batch_data,current_topology,slo_targets},
+  emphstyle=\color{KeywordBlue},
+  % color operators, braces, punctuation, and digits
+  literate=
+   *{+}{{{\color{OpRed}+}}}1
+    {-}{{{\color{OpRed}-}}}1
+    {*}{{{\color{OpRed}*}}}1
+    {/}{{{\color{OpRed}/}}}1
+    {=}{{{\color{OpRed}=}}}1
+    {:}{{{\color{OpRed}:}}}1
+    {,}{{{\color{OpRed},}}}1
+    {(}{{{\color{OpRed}(}}}1
+    {)}{{{\color{OpRed})}}}1
+    {[}{{{\color{OpRed}[}}}1
+    {]}{{{\color{OpRed}]}}}1
+    {.}{{{\color{OpRed}.}}}1
+    {0}{{{\color{NumTeal}0}}}1
+    {1}{{{\color{NumTeal}1}}}1
+    {2}{{{\color{NumTeal}2}}}1
+    {3}{{{\color{NumTeal}3}}}1
+    {4}{{{\color{NumTeal}4}}}1
+    {5}{{{\color{NumTeal}5}}}1
+    {6}{{{\color{NumTeal}6}}}1
+    {7}{{{\color{NumTeal}7}}}1
+    {8}{{{\color{NumTeal}8}}}1
+    {9}{{{\color{NumTeal}9}}}1
+}
+
 \newcommand\blfootnote[1]{%
   \begingroup
   \renewcommand\thefootnote{}\footnote{#1}%
@@ -72,6 +123,7 @@
         \node[shape=circle, fill=black, text=white, inner sep=0.5pt, font=\small] (char) {#1};
     }%
 }
+
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
