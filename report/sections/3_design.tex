@@ -127,7 +127,6 @@ In OpenDT, we use GPT-3.5 to generate topological configurations for datacenter 
 for example, although more tasks may arrive, the LLM should ensure an SLO-compliant execution time and resource utilization.
 
 
-
 The LLM is guided through prompt engineering, wherein contextual information is provided, including the results of OpenDC simulations for the current topology, and the corresponding Service Level Objectives (SLOs). 
 Based on this input, the model infers and recommends new topological parameters—such as the number of hosts, clock speed, and number of cores—that are expected to yield improved performance.
 We present in \Cref{lst:opendt-prompt} the prompt OpenDT uses to adjust ICT configuration and aim to meet the SLOs. The prompt follows community-established principles of prompt engineering~\citationsneeded{2}, and is structured in four main components: 1) the LLM receives a role, specifically \textit{``datacenter practitioner"}, 2) the LLM receives the task, specifically to adjust the topology such that SLOs are met, 3) the LLM receives the user-(practitioner-)defined SLOs and the topology at the given timestamp, and, lastly, 4) the LLM receives the output format. To prevent errors, OpenDT validates and further processes prompts only if the LLM's (non-deterministic) output matches the format requested in the prompt.
