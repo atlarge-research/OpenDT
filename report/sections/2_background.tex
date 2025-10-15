@@ -3,11 +3,18 @@
 \begin{figure}
     \centering
     \includegraphics[width=0.75\linewidth]{report/figures/background.pdf}
-    \caption{High-level overview and comparison on physical twin (PT) and digital twin (DT) interaction in simulation, digital shadowing, and digital twinning.}
+    \caption{High-level overview and comparison of physical twin (PT) and digital twin (DT) interaction in simulation, digital shadowing, and digital twinning.}
     \label{fig:background}
 \end{figure}
 
 In this section, we present background on datacenter simulation, digital shadowing, and digital twinning, and a high-level comparison between these operational techniques illustrated by \Cref{fig:background}.
+
+\begin{figure*}[h]
+    \centering
+    \hspace*{-0.55cm}\includegraphics[width=1.05\linewidth]{report/figures/opendt-design.pdf} 
+    \caption{Architecture overview of OpenDT, a digital twinning ecosystem for monitoring and operating datacenters.}
+    \label{fig:opendt-design}
+\end{figure*}
 
 \textit{``Simulation is defined as the imitation of the operation of a system or real-world process over time, and in many cases, manufacturing provides one of the most important application of simulation"}~\cite{DBLP:conf/wsc/LeeMS03, nicolae5377101m3sa}. Simulation provide datacenter stakeholders with operational insights on infrastructure under workload~\cite{nicolae5377101m3sa}. The top third of~\Cref{fig:background} illustrates simulation as a unique-state prediction task of the physical twin under a simulation scenario. Simulators use \textit{predictive models}, empirical prediction systems that analyze, combine, and compute various input elements to produce fine-grained output predictions~\cite{modsim:book/ZaraiN15:orig, nicolae5377101m3sa}.
 
