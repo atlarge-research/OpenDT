@@ -1,6 +1,12 @@
 \section{Implementation of an OpenDT prototype}\label{sec:prototype}
 In this section, we present implementation details of OpenDT, matching step 5 from the community-standard research methodology on the distributed systems. In this early prototype, due to time resource constrains, we couple OpenDT with data obtained from a real-world datacenter and used in peer-reviewed literature; we planned future work in coupling OpenDT with real-world ICT infrastructure, which would send telemetry data to the OpenDT and receive adjustment feedback from OpenDT.
 
+
+\subsection{Dataset}\label{sec:dataset}
+
+To replicate the real-world infrastructure (i.e., physical twin), we replay data from the FAIR dataset of SURF-22, a scientific workload trace used in peer-reviewed experiments~\cite{DBLP:conf/wosp/NiewenhuisTIM24, nicolae5377101m3sa}. SURF-22 was traced in one of the largest HPC facilities at SURF, Netherlands, over 7 days, in October 2022, and contains anonymised scientific jobs run in production, batch, with an average duration of 39.52 CPU-hours and also detailed energy use over the same period~\cite{nicolae5377101m3sa}. The SURF workload contains 7,850 tasks, and 2,323,475 corresponding fragments, spanning in total approximately 310,000 CPU hours, and are sampled at a granularity of 30 seconds~\cite{nicolae5377101m3sa}. Many thanks to AtLarge Research and our collaborators from SURF for the FAIR dataset released to open-science.
+
+
 \begin{table}[t]
 \centering
 \renewcommand{\arraystretch}{1.1}
@@ -37,11 +43,6 @@ cpu\_capacity  & float64 & MHz  & CPU capacity used in fragment \\
 \caption{Schema of the fragments dataset. OpenDC is compatible with the fragments schema explained in~\cite{opendc-workload}.}
 \label{tab:fragments_schema}
 \end{table}
-
-
-\subsection{Dataset}\label{sec:dataset}
-
-To replicate the real-world infrastructure (i.e., physical twin), we replay data from the FAIR dataset of SURF-22, a scientific workload trace used in peer-reviewed experiments~\cite{DBLP:conf/wosp/NiewenhuisTIM24, nicolae5377101m3sa}. SURF-22 was traced in one of the largest HPC facilities at SURF, Netherlands, over 7 days, in October 2022, and contains anonymised scientific jobs run in production, batch, with an average duration of 39.52 CPU-hours and also detailed energy use over the same period~\cite{nicolae5377101m3sa}. The SURF workload contains 7,850 tasks, and 2,323,475 corresponding fragments, spanning in total approximately 310,000 CPU hours, and are sampled at a granularity of 30 seconds~\cite{nicolae5377101m3sa}. Many thanks to AtLarge Research and our collaborators from SURF for the FAIR dataset released to open-science.
 
 \Cref{tab:tasks_schema} presents the schema underlying the tasks component and \Cref{tab:fragments_schema} presents the schema of the fragments component of the SURF-22 dataset. In the SURF-22 workload, OpenDC-compatible, fragments are ordered and grouped into chunks and all the fragments beloning to a task share the same id, specifically the ID of the parent task.
 
