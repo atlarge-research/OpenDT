@@ -1,18 +1,18 @@
-"""Integration tests for the main orchestrator module and Flask entrypoints."""
+"""Integration tests for the main orchestrator module."""
 
 import json
 from pathlib import Path
 
 import pytest
 
-import main
+from opendt.orchestrator.controller import OpenDTOrchestrator
 
 
 @pytest.fixture
 def orchestrator(monkeypatch):
     """Instantiate an orchestrator without background watchers for isolated tests."""
-    monkeypatch.setattr(main.OpenDTOrchestrator, "start_topology_watcher", lambda self: None)
-    orch = main.OpenDTOrchestrator()
+    monkeypatch.setattr(OpenDTOrchestrator, "start_topology_watcher", lambda self: None)
+    orch = OpenDTOrchestrator()
     orch.stop_event.set()
     return orch
 
@@ -74,18 +74,6 @@ def test_run_simulation_passes_window_data(orchestrator):
     assert captured["fragments"] == batch["fragments_sample"]
     assert captured["topology"] == orch.state["current_topology"]
     assert captured["expName"] == "window-1"
-
-
-def test_flask_set_slo_endpoint():
-    """The set_slo endpoint should update global SLO targets."""
-    client = main.app.test_client()
-    response = client.post("/api/set_slo", json={"energy_target": 5, "runtime_target": 1})
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["energy_target"] == 5
-    assert data["runtime_target"] == 1
-    assert main.orchestrator.slo_targets["energy_target"] == 5
-    assert main.orchestrator.slo_targets["runtime_target"] == 1
 
 
 def test_topo_hash_stable(orchestrator):
