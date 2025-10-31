@@ -104,7 +104,7 @@ function drawPlot(plot_name, x, y, extraConfigLayout, isNew = false) {
     if (extraConfigLayout.title) {
       layout.yaxis.title = {
         ...(layout.yaxis.title || {}),
-        text: extraConfigLayout.title,
+        text: '',
       };
     }
   }
