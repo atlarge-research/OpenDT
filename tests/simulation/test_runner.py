@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from opendc_runner import OpenDCRunner
+from opendt.simulation.runner import OpenDCRunner
 
 
 def test_create_workload_writes_parquet(tmp_path, monkeypatch):
@@ -30,18 +30,16 @@ def test_create_workload_writes_parquet(tmp_path, monkeypatch):
     assert len(frags_df) == 1
 
 
-def test_create_enhanced_mock_results_appends(tmp_path, monkeypatch):
-    """Mock results should be written and appended to on subsequent invocations."""
+def test_run_simulation_without_runner_reports_error():
+    """When the OpenDC binary is missing, an error payload should be returned."""
+
     runner = OpenDCRunner()
-    monkeypatch.setenv("OPENDT_SIM_DIR", str(tmp_path))
 
-    result = runner.create_enhanced_mock_results(tasks_data=[{"id": 1}], fragments_data=[{"id": 1}])
+    result = runner.run_simulation(
+        tasks_data=[{"id": 1}],
+        fragments_data=[{"id": 1}],
+        topology_data={"hosts": []},
+    )
 
-    assert result["status"] == "mock"
-    power_file = Path(tmp_path) / "powerSource.parquet"
-    host_file = Path(tmp_path) / "host.parquet"
-    assert power_file.exists()
-    assert host_file.exists()
-
-    updated = runner.create_enhanced_mock_results(tasks_data=[{"id": 1}], fragments_data=[{"id": 1}])
-    assert updated["energy_kwh"] >= result["energy_kwh"]
+    assert result["status"] == "error"
+    assert "reason" in result and result["reason"]
