@@ -116,7 +116,6 @@ class LLM:
         if current_topology:
             self.update_best_configuration(sim_results, current_topology)
 
-        logger.info("Open ai key is: %s", self.openai_key)
         llm = ChatOpenAI(
             api_key=self.openai_key,
             model="gpt-3.5-turbo",
@@ -164,7 +163,9 @@ class LLM:
         logger.info("🤖 Calling OpenAI for topology optimization...")
         response = llm.invoke(prompt)
         logger.info("Received response from OpenAI")
-        parsed = parser.parse(response.content)
+
+        raw_content = self._extract_text_content(response)
+        parsed = parser.parse(raw_content)
 
         if current_topology:
             new_topology = copy.deepcopy(current_topology)
@@ -175,13 +176,15 @@ class LLM:
 
         logger.info("Generated new topology from LLM recommendation")
 
+        recommendations = parsed.dict() if hasattr(parsed, "dict") else parsed
+
         return {
             'type': 'llm',
             'reason': 'LLM recommendation applied',
             'new_topology': new_topology,
             'best_config': self.best_config,
             'best_score': self.best_score if self.best_config else None,
-            'recommendations': parsed.dict(),
+            'recommendations': recommendations,
         }
 
     def convert_llm_to_topology(self, llm_result, current_topology):
@@ -235,3 +238,32 @@ class LLM:
             logger.error("Error converting LLM output to topology: %s", exc)
 
         return new_topology
+
+    @staticmethod
+    def _extract_text_content(message: Any) -> str:
+        """Normalize LangChain/OpenAI message payloads into plain text."""
+
+        if message is None:
+            return ""
+
+        content = getattr(message, "content", message)
+
+        if isinstance(content, str):
+            return content.strip()
+
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict):
+                    text = item.get("text")
+                    if text:
+                        parts.append(str(text))
+                else:
+                    text = getattr(item, "text", None)
+                    if text:
+                        parts.append(str(text))
+            return "".join(parts).strip()
+
+        return str(content).strip()
