@@ -1,16 +1,12 @@
-"""Shared pytest fixtures and Kafka stubs used across the test suite."""
-
 import sys
 import types
 
 import pytest
 
-
 fake_kafka = types.ModuleType("kafka")
 
 
 class _KafkaProducer:
-    """Minimal KafkaProducer stub used to satisfy orchestrator imports."""
     def __init__(self, *args, **kwargs):
         pass
 
@@ -22,7 +18,6 @@ class _KafkaProducer:
 
 
 class _KafkaConsumer:
-    """Minimal KafkaConsumer stub returning an empty iterator."""
     def __init__(self, *args, **kwargs):
         pass
 
@@ -35,18 +30,26 @@ fake_kafka.KafkaConsumer = _KafkaConsumer
 
 sys.modules.setdefault("kafka", fake_kafka)
 
-import main
+from opendt.app import create_app
+from opendt.orchestrator.controller import OpenDTOrchestrator
 
 
-@pytest.fixture(scope="session", autouse=True)
-def stop_background_threads():
-    """Ensure the global orchestrator threads do not interfere with tests."""
-    try:
-        main.orchestrator.stop_event.set()
-    except AttributeError:
-        pass
-    yield
-    try:
-        main.orchestrator.stop_event.set()
-    except AttributeError:
-        pass
+@pytest.fixture
+def orchestrator(monkeypatch):
+    monkeypatch.setattr(OpenDTOrchestrator, "start_topology_watcher", lambda self: None)
+    orch = OpenDTOrchestrator()
+    orch.stop_event.set()
+    return orch
+
+
+@pytest.fixture
+def app(monkeypatch):
+    monkeypatch.setattr(OpenDTOrchestrator, "start_topology_watcher", lambda self: None)
+    flask_app = create_app()
+    flask_app.orchestrator.stop_event.set()
+    return flask_app
+
+
+@pytest.fixture
+def client(app):
+    return app.test_client()

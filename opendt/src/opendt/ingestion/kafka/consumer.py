@@ -6,7 +6,7 @@ import logging
 from collections import deque
 import threading
 import pandas as pd
-from consts import *
+from ...config.settings import *
 
 logger = logging.getLogger(__name__)
 

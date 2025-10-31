@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import threading
 from time import sleep
-from consts import TIME_SCALE
+from ...config.settings import TIME_SCALE
 
 logger = logging.getLogger(__name__)
 
