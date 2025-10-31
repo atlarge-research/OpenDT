@@ -57,6 +57,7 @@ class LLM:
     def rule_based_optimization(self, sim_results, batch_data, slo_targets, current_topology=None, reason=""):
         """Simple rule-based optimization with topology updates"""
         energy = sim_results.get('energy_kwh', 2.0)
+        cpu_util = sim_results.get('cpu_utilization', 0.0)
 
         # TODO: instead of CPU_utilization, find out the total time elapsed in running the tasks
         runtime_hours = sim_results.get('runtime_hours', 2)
@@ -64,10 +65,11 @@ class LLM:
 
         recommendations = []
         new_topology = None
+        action = "maintain"
 
         if current_topology:
             # Update best configuration tracking
-            is_new_best = self.update_best_configuration(sim_results, current_topology)
+            self.update_best_configuration(sim_results, current_topology)
 
             # Generate new topology based on rules
             new_topology = copy.deepcopy(current_topology)
@@ -79,7 +81,7 @@ class LLM:
             # TODO: else it's good, show green.
 
             # TODO: do this for energy and performance at the same time. e.g., if at least one of them is bad, then it's bad.
-            if energy > slo.get('energy_target', 10.0) * 1.15:
+            if energy > slo_targets.get('energy_target', 10.0) * 1.15:
                 recommendations.append("🔥 CRITICAL: Reduce host count - very high energy consumption")
                 action = "massive downscale"
                 # Reduce host count if possible
@@ -87,7 +89,7 @@ class LLM:
                     for host in cluster.get('hosts', []):
                         if host.get('count', 1) > 1:
                             host['count'] = max(1, host['count'] - 1)
-            elif energy > slo.get('energy_target', 10.0):
+            elif energy > slo_targets.get('energy_target', 10.0):
                 recommendations.append("⚠️ HIGH: Consider reducing core speed - high energy usage")
                 action = "downscale"
                 # Reduce core speed
@@ -96,7 +98,7 @@ class LLM:
                         current_speed = host.get('cpu', {}).get('coreSpeed', 2400)
                         if current_speed > 2000:
                             host['cpu']['coreSpeed'] = max(2000, int(current_speed * 0.9))
-            elif runtime_hours > slo.get('runtime_target', 2) * 1.15:
+            elif runtime_hours > slo_targets.get('runtime_target', 2) * 1.15:
                 recommendations.append("📈 SCALE UP: Add CPU cores - high utilization")
                 action = "upscale"
                 # Increase core count
@@ -105,7 +107,7 @@ class LLM:
                         current_cores = host.get('cpu', {}).get('coreCount', 16)
                         if current_cores < 32:
                             host['cpu']['coreCount'] = min(32, current_cores + 4)
-            elif runtime_hours > slo.get('runtime_target', 2):
+            elif runtime_hours > slo_targets.get('runtime_target', 2):
                 recommendations.append("📉 CONSOLIDATE: Reduce cores - low utilization")
                 action = "slightly downscale"
                 # Reduce core count
@@ -116,7 +118,6 @@ class LLM:
                             host['cpu']['coreCount'] = max(8, current_cores - 2)
             else:
                 recommendations.append("✅ OPTIMAL: Current configuration is efficient")
-                action = "maintain"
 
         return {
             'type': 'rule_based',
