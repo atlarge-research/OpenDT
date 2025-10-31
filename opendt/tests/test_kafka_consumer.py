@@ -1,3 +1,5 @@
+"""End-to-end tests for assembling DigitalTwinConsumer telemetry windows."""
+
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -6,10 +8,12 @@ from kafka_consumer import DigitalTwinConsumer
 
 
 def _iso(ts: datetime) -> str:
+    """Return the ISO-8601 string representation of ``ts``."""
     return ts.isoformat()
 
 
 def test_create_batch_compiles_window_data():
+    """Create a window with tasks/fragments and ensure ``create_batch`` aggregates it."""
     consumer = DigitalTwinConsumer(bootstrap_servers="localhost:9092", kafka_group_id="test")
     now = datetime.utcnow()
     task = {"id": 1, "submission_time": _iso(now), "duration": 100, "cpu_count": 2, "cpu_capacity": 2.4, "mem_capacity": 1024}

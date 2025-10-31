@@ -1,3 +1,5 @@
+"""Unit tests for the LLM optimization strategies and topology translation."""
+
 import copy
 
 import pytest
@@ -6,6 +8,7 @@ from llm import LLM
 
 
 def sample_topology():
+    """Return a minimal topology fixture for optimizer exercises."""
     return {
         "clusters": [
             {
@@ -24,6 +27,7 @@ def sample_topology():
 
 
 def test_rule_based_optimization_downscales_energy(monkeypatch):
+    """The rule-based optimizer should downscale when consumption exceeds the SLO."""
     optimizer = LLM(openai_key=None)
     topology = sample_topology()
     sim_results = {"energy_kwh": 15.0, "runtime_hours": 1.5, "cpu_utilization": 0.7}
@@ -38,6 +42,7 @@ def test_rule_based_optimization_downscales_energy(monkeypatch):
 
 
 def test_rule_based_tracks_best_configuration():
+    """Persist the best configuration score after an optimization run."""
     optimizer = LLM(openai_key=None)
     topology = sample_topology()
     sim_results = {"energy_kwh": 5.0, "runtime_hours": 1.0}
@@ -48,6 +53,7 @@ def test_rule_based_tracks_best_configuration():
 
 
 def test_convert_llm_to_topology_adds_hosts():
+    """Ensure LLM recommendations are merged as new hosts into the topology."""
     optimizer = LLM(openai_key="dummy")
     topology = sample_topology()
     rec = type("Obj", (), {

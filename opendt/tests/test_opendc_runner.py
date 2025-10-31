@@ -1,3 +1,5 @@
+"""Regression tests for the OpenDC runner workload generation utilities."""
+
 from pathlib import Path
 
 import pandas as pd
@@ -6,6 +8,7 @@ from opendc_runner import OpenDCRunner
 
 
 def test_create_workload_writes_parquet(tmp_path, monkeypatch):
+    """Workload creation should persist tasks/fragments parquet datasets."""
     runner = OpenDCRunner()
     monkeypatch.setenv("OPENDT_SIM_DIR", str(tmp_path))
 
@@ -28,6 +31,7 @@ def test_create_workload_writes_parquet(tmp_path, monkeypatch):
 
 
 def test_create_enhanced_mock_results_appends(tmp_path, monkeypatch):
+    """Mock results should be written and appended to on subsequent invocations."""
     runner = OpenDCRunner()
     monkeypatch.setenv("OPENDT_SIM_DIR", str(tmp_path))
 

@@ -1,3 +1,5 @@
+"""Shared pytest fixtures and Kafka stubs used across the test suite."""
+
 import sys
 import types
 
@@ -8,6 +10,7 @@ fake_kafka = types.ModuleType("kafka")
 
 
 class _KafkaProducer:
+    """Minimal KafkaProducer stub used to satisfy orchestrator imports."""
     def __init__(self, *args, **kwargs):
         pass
 
@@ -19,6 +22,7 @@ class _KafkaProducer:
 
 
 class _KafkaConsumer:
+    """Minimal KafkaConsumer stub returning an empty iterator."""
     def __init__(self, *args, **kwargs):
         pass
 

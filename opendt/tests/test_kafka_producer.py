@@ -1,3 +1,5 @@
+"""Behavioral tests for the TimedKafkaProducer streaming helpers."""
+
 from datetime import datetime
 
 import pandas as pd
@@ -6,6 +8,7 @@ from kafka_producer import TimedKafkaProducer
 
 
 class DummyProducer:
+    """Kafka producer test double that records outbound messages."""
     def __init__(self):
         self.messages = []
 
@@ -17,6 +20,7 @@ class DummyProducer:
 
 
 def test_tasks_streaming_thread_sends_in_order(monkeypatch):
+    """Ensure tasks are emitted sequentially with the correct key and payload."""
     producer = TimedKafkaProducer(bootstrap_servers="localhost:9092")
     producer.start_streaming_barrier = type("B", (), {"wait": staticmethod(lambda: None)})
     producer.producer = DummyProducer()
@@ -38,6 +42,7 @@ def test_tasks_streaming_thread_sends_in_order(monkeypatch):
 
 
 def test_fragments_streaming_thread_sends(monkeypatch):
+    """Verify fragment payloads are flushed to the expected Kafka topic."""
     producer = TimedKafkaProducer(bootstrap_servers="localhost:9092")
     producer.start_streaming_barrier = type("B", (), {"wait": staticmethod(lambda: None)})
     producer.producer = DummyProducer()
