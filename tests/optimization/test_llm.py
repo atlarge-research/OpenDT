@@ -1,6 +1,7 @@
 """Unit tests for the LLM optimization strategies and topology translation."""
 
-import copy
+import json
+import sys
 
 import pytest
 
@@ -70,3 +71,65 @@ def test_convert_llm_to_topology_adds_hosts():
     assert "C02" in cluster_names
     host_counts = [h["count"] for c in new_topology["clusters"] for h in c["hosts"] if h["name"] in {"H02", "H99"}]
     assert host_counts == [1, 2]
+
+
+def test_extract_text_content_handles_structured_payloads():
+    """The helper should flatten LangChain message payloads into a JSON string."""
+    optimizer = LLM(openai_key="dummy")
+
+    message = type(
+        "Message",
+        (),
+        {
+            "content": [
+                {"type": "text", "text": "{"},
+                "\"foo\"",
+                type("Chunk", (), {"text": ": \"bar\"}"})(),
+            ]
+        },
+    )()
+
+    flattened = optimizer._extract_text_content(message)
+    assert flattened == '{"foo": "bar"}'
+
+
+def test_llm_optimization_parses_ai_message_list(monkeypatch):
+    """LLM.optimize should parse structured AIMessage content returned by LangChain."""
+
+    optimizer = LLM(openai_key="dummy")
+    topology = sample_topology()
+    sim_results = {"energy_kwh": 9.0, "runtime_hours": 1.2, "cpu_utilization": 0.5}
+    batch = {"task_count": 4, "fragment_count": 12, "avg_cpu_usage": 0.4}
+    slo = {"energy_target": 10.0, "runtime_target": 2.0}
+
+    payload = {
+        "cluster_name": ["C01"],
+        "host_name": ["H02"],
+        "count": [1],
+        "coreCount": [24],
+        "coreSpeed": [2500],
+    }
+
+    class DummyChatModule:
+        class ChatOpenAI:  # noqa: D401 - simple stub for tests
+            def __init__(self, *args, **kwargs):  # pragma: no cover - trivial
+                pass
+
+            def invoke(self, prompt):  # pragma: no cover - simple deterministic stub
+                return type(
+                    "AIMessage",
+                    (),
+                    {
+                        "content": [
+                            {"type": "text", "text": json.dumps(payload)},
+                        ]
+                    },
+                )()
+
+    monkeypatch.setitem(sys.modules, "langchain_openai", DummyChatModule)
+
+    result = optimizer.llm_optimization(sim_results, batch, slo, current_topology=topology)
+
+    assert result["type"] == "llm"
+    assert result["recommendations"]["host_name"] == payload["host_name"]
+    assert any(host["name"] == "H02" for c in result["new_topology"]["clusters"] for host in c["hosts"])
