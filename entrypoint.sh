@@ -10,6 +10,14 @@ if command -v java >/dev/null 2>&1; then
   fi
 fi
 
+# Ensure Python can resolve the in-repo package layout
+if [ -d /app/src ]; then
+  case ":$PYTHONPATH:" in
+    *":/app/src:"*) ;;
+    *) export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/app/src" ;;
+  esac
+fi
+
 # Ensure the OpenDC runner is executable (covers bind-mount cases)
 RUNNER="/app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"
 if [ -f "$RUNNER" ]; then

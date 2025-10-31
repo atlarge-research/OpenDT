@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from opendc_runner import OpenDCRunner
+from opendt.simulation.runner import OpenDCRunner
 
 
 def test_create_workload_writes_parquet(tmp_path, monkeypatch):

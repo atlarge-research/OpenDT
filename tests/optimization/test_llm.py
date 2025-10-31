@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from llm import LLM
+from opendt.optimization.llm import LLM
 
 
 def sample_topology():

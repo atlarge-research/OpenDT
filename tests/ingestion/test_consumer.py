@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from kafka_consumer import DigitalTwinConsumer
+from opendt.ingestion.kafka.consumer import DigitalTwinConsumer
 
 
 def _iso(ts: datetime) -> str:
