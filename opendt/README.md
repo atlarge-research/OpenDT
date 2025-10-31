@@ -15,3 +15,13 @@ docker-compose up --build
 
 Then, open http://localhost:8080 for the orchestrator UI.
 
+## Running the Test Suite
+
+The test harness mirrors production by running inside the Docker Compose stack. From the project root run:
+
+```bash
+./scripts/run_tests.sh
+```
+
+Pass additional pytest arguments as needed, for example `./scripts/run_tests.sh -k kafka` to focus on Kafka-related specs.
+
