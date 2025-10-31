@@ -52,20 +52,47 @@ async function fetchTS() {
 }
 
 const PLOTS = {
-  cpu_usages:   { range: [0.0, 1.0], autorange: false },
-  power_usages: { range: [0.0, 5.0], autorange: true  }
+  cpu_usages: {
+    range: [0, 100],
+    autorange: false,
+    title: 'Average CPU Utilization [%]',
+    legend: 'Average CPU Utilization [%]',
+    transform: value => value * 100,
+  },
+  power_usages: {
+    autorange: true,
+    title: 'Power [kWh]',
+    legend: 'Power [kWh]',
+  }
 };
+
+function mapValues(values, transform) {
+  if (!Array.isArray(values)) return [];
+  if (typeof transform !== 'function') return values;
+  return values.map(v => {
+    if (v === null || v === undefined) return null;
+    const numeric = Number(v);
+    if (!Number.isFinite(numeric)) return null;
+    return transform(numeric);
+  });
+}
 
 function drawPlot(plot_name, x, y, extraConfigLayout, isNew = false) {
   const trace = {
     x, y,
     mode: 'lines',
-    name: plot_name,
+    name: (extraConfigLayout && extraConfigLayout.legend) || plot_name,
     line: { color: COLORS.real, width: 2 }
   };
 
   // base layout
   const layout = layoutFor('');
+
+  // always anchor plots to zero on the y-axis
+  layout.yaxis = {
+    ...layout.yaxis,
+    rangemode: 'tozero',
+  };
 
   // apply y-axis config from plot-specific settings
   if (extraConfigLayout) {
@@ -74,6 +101,12 @@ function drawPlot(plot_name, x, y, extraConfigLayout, isNew = false) {
       ...(extraConfigLayout.range ? { range: extraConfigLayout.range } : {}),
       ...(extraConfigLayout.autorange !== undefined ? { autorange: extraConfigLayout.autorange } : {})
     };
+    if (extraConfigLayout.title) {
+      layout.yaxis.title = {
+        ...(layout.yaxis.title || {}),
+        text: extraConfigLayout.title,
+      };
+    }
   }
 
   const el = document.getElementById(plot_name);
@@ -100,7 +133,12 @@ async function drawCharts() {
   try {
     const d = await fetchTS();
    
-    Object.keys(PLOTS).forEach(plot_name => drawPlot(plot_name, d.timestamps, d[plot_name], PLOTS[plot_name]));
+    const xValues = Array.isArray(d.timestamps) ? d.timestamps : [];
+    Object.keys(PLOTS).forEach(plot_name => {
+      const cfg = PLOTS[plot_name] || {};
+      const yValues = mapValues(d[plot_name], cfg.transform);
+      drawPlot(plot_name, xValues, yValues, cfg);
+    });
   } catch (err) {
     console.error('drawCharts error:', err);
   }
