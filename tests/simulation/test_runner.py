@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from opendt.simulation.runner import OpenDCRunner
 
@@ -30,18 +31,10 @@ def test_create_workload_writes_parquet(tmp_path, monkeypatch):
     assert len(frags_df) == 1
 
 
-def test_create_enhanced_mock_results_appends(tmp_path, monkeypatch):
-    """Mock results should be written and appended to on subsequent invocations."""
+def test_run_simulation_without_runner_raises():
+    """Running a simulation without the binary should raise a helpful exception."""
     runner = OpenDCRunner()
-    monkeypatch.setenv("OPENDT_SIM_DIR", str(tmp_path))
+    runner.opendc_path = None
 
-    result = runner.create_enhanced_mock_results(tasks_data=[{"id": 1}], fragments_data=[{"id": 1}])
-
-    assert result["status"] == "mock"
-    power_file = Path(tmp_path) / "powerSource.parquet"
-    host_file = Path(tmp_path) / "host.parquet"
-    assert power_file.exists()
-    assert host_file.exists()
-
-    updated = runner.create_enhanced_mock_results(tasks_data=[{"id": 1}], fragments_data=[{"id": 1}])
-    assert updated["energy_kwh"] >= result["energy_kwh"]
+    with pytest.raises(FileNotFoundError):
+        runner.run_simulation(tasks_data=None, fragments_data=None, topology_data={})
