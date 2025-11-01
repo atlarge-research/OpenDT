@@ -157,67 +157,54 @@
             <!-- LLM Recommendation -->
             <div class="card glass lift llm-card">
                 <div class="ui-only">
-                    <div class="llm-card-header">
-                        <div class="llm-card-heading">
+                    <div class="llm-card-title">
+                        <div class="llm-card-title-text">
                             <h3>🤖 LLM Suggested Topology</h3>
                             <p class="llm-card-subtitle">Live recommendations from optimization pipeline</p>
                         </div>
-                        <div class="llm-card-header-actions">
-                            <span id="llmStatusMessage" class="llm-status-pill" data-state="idle">Awaiting recommendation</span>
-                            <div class="llm-action-group">
-                                <button id="btnAcceptRec"
-                                        class="btn btn-success"
-                                        onclick="acceptRecommendation()"
-                                        disabled>
-                                    <span class="icon" style="--icon-url:var(--sym-check)"></span>&nbsp;Accept
-                                </button>
-                                <button id="btnEditRec"
-                                        class="btn btn-secondary"
-                                        onclick="window.recommendationEditor?.startEditing()"
-                                        title="Edit recommendation"
-                                        aria-label="Edit recommendation"
-                                        disabled>
-                                    <span class="icon" style="--icon-url:var(--sym-edit)"></span>
-                                </button>
-                                <button id="btnConfirmRec"
-                                        class="btn btn-success btn-icon"
-                                        onclick="window.recommendationEditor?.commitEditing()"
-                                        hidden
-                                        title="Apply edits"
-                                        aria-label="Apply edits">
-                                    ✔
-                                </button>
-                                <button id="btnCancelRec"
-                                        class="btn btn-danger btn-icon"
-                                        onclick="window.recommendationEditor?.cancelEditing()"
-                                        hidden
-                                        title="Discard edits"
-                                        aria-label="Discard edits">
-                                    ✖
-                                </button>
-                            </div>
-                        </div>
+                        <span id="llmStatusMessage" class="llm-status-pill" data-state="idle">Awaiting recommendation</span>
                     </div>
 
-                    <div class="llm-body-grid">
-                        <div class="llm-summary-grid">
-                            <div class="llm-summary-item"><span>Action</span><strong id="kvLLMAction">—</strong></div>
-                            <div class="llm-summary-item"><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
-                            <div class="llm-summary-item"><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
-                        </div>
-
-                        <div class="llm-rationale-card">
-                            <span class="llm-rationale-label">Rationale</span>
-                            <p class="llm-rationale" id="kvLLMReason">—</p>
-                        </div>
+                    <div class="kv llm-meta">
+                        <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
+                        <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
+                        <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
                     </div>
 
-                    <div class="llm-table-wrapper">
-                        <div class="llm-table-header">
-                            <h4>Topology preview</h4>
-                            <span class="llm-table-hint">Updated with each accepted change</span>
-                        </div>
-                        <table id="recTable">
+                    <p class="llm-reason" id="kvLLMReason">—</p>
+
+                    <div class="rec-actions">
+                        <button id="btnAcceptRec"
+                                class="btn btn-success"
+                                onclick="acceptRecommendation()"
+                                disabled>
+                            <span class="icon" style="--icon-url:var(--sym-check)"></span>&nbsp;Accept Recommendation
+                        </button>
+                        <button id="btnEditRec"
+                                class="btn btn-secondary"
+                                onclick="window.recommendationEditor?.startEditing()"
+                                disabled>
+                            <span class="icon" style="--icon-url:var(--sym-edit)"></span>&nbsp;Edit Recommendation
+                        </button>
+                        <button id="btnConfirmRec"
+                                class="btn btn-success"
+                                onclick="window.recommendationEditor?.commitEditing()"
+                                hidden
+                                title="Apply edits"
+                                aria-label="Apply edits">
+                            Save changes
+                        </button>
+                        <button id="btnCancelRec"
+                                class="btn btn-danger"
+                                onclick="window.recommendationEditor?.cancelEditing()"
+                                hidden
+                                title="Discard edits"
+                                aria-label="Discard edits">
+                            Cancel
+                        </button>
+                    </div>
+
+                    <table id="recTable">
                         <thead>
                         <tr>
                             <th>Cluster</th>
@@ -233,8 +220,7 @@
                             <td colspan="6">No recommendation</td>
                         </tr>
                         </tbody>
-                        </table>
-                    </div>
+                    </table>
                 </div>
                 <pre class="json-only" id="recJSON">null</pre>
                 <pre class="json-only" id="llmJSON">null</pre>
