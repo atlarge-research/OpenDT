@@ -176,12 +176,44 @@ class OpenDCRunner:
 
     def parse_opendc_results(self) -> dict[str, Any]:
         try:
-            output_dirs = [
-                Path("output/opendt-simulation/raw-output/0/seed=0"),
-                Path("./output/simple/raw-output/0/seed=0"),
-                Path("/tmp/output"),
-                Path(os.environ.get("OPENDT_SIM_DIR") or "/app/output/opendt-simulation/raw-output"),
-            ]
+            def expand_candidates(base: Path) -> list[Path]:
+                """Return possible parquet folders derived from *base*.
+
+                Some callers provide the exact ``seed=0`` directory while others
+                point to a parent folder. We probe a few well-known layouts to
+                keep the logic robust without hard-coding a single path.
+                """
+
+                options: list[Path] = []
+                if not base:
+                    return options
+                options.append(base)
+                # Common OpenDC export structures
+                options.extend(
+                    base / suffix
+                    for suffix in (
+                        "raw-output/0/seed=0",
+                        "opendt-simulation/raw-output/0/seed=0",
+                        "simple/raw-output/0/seed=0",
+                        "0/seed=0",
+                    )
+                )
+                return options
+
+            env_dir = os.environ.get("OPENDT_SIM_DIR")
+            if env_dir:
+                base = Path(env_dir).expanduser()
+                output_dirs = expand_candidates(base)
+            else:
+                defaults = [
+                    Path("output/opendt-simulation/raw-output/0/seed=0"),
+                    Path("./output/simple/raw-output/0/seed=0"),
+                    Path("/tmp/output"),
+                    Path("/app/output/opendt-simulation/raw-output"),
+                ]
+                output_dirs = []
+                for candidate in defaults:
+                    output_dirs.extend(expand_candidates(candidate))
 
             power_df = host_df = service_df = None
             source_dir: Path | None = None

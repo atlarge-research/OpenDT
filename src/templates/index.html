@@ -155,23 +155,33 @@
             </div>
 
             <!-- LLM Recommendation -->
-            <div class="card glass lift">
+            <div class="card glass lift llm-card">
                 <div class="ui-only">
-                    <h3>🤖 LLM Suggested Topology</h3>
-                    <div class="kv">
-                        <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
-                        <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
-                        <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
+                    <div class="llm-card-header">
+                        <h3>🤖 LLM Suggested Topology</h3>
+                        <div class="llm-card-header-actions">
+                            <span id="llmStatusMessage" class="llm-status-pill" data-state="idle">Awaiting recommendation</span>
+                            <button id="btnAcceptRec"
+                                    class="btn btn-success"
+                                    onclick="acceptRecommendation()"
+                                    disabled>
+                                <span class="icon" style="--icon-url:var(--sym-check)"></span>&nbsp;Accept Recommendation
+                            </button>
+                        </div>
                     </div>
-                    <p class="llm-reason" id="kvLLMReason">—</p>
 
-                    <div class="rec-actions">
-                        <button id="btnAcceptRec"
-                                class="btn btn-success"
-                                onclick="acceptRecommendation()"
-                                disabled>
-                            <span class="icon" style="--icon-url:var(--sym-check)"></span>&nbsp;Accept Recommendation
-                        </button>
+                    <div class="llm-summary-grid">
+                        <div class="llm-summary-item"><span>Action</span><strong id="kvLLMAction">—</strong></div>
+                        <div class="llm-summary-item"><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
+                        <div class="llm-summary-item"><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
+                    </div>
+
+                    <div class="llm-reason-block">
+                        <span class="llm-reason-label">Rationale</span>
+                        <p class="llm-reason" id="kvLLMReason">—</p>
+                    </div>
+
+                    <div class="llm-editor-actions">
                         <button id="btnEditRec"
                                 class="btn btn-secondary"
                                 onclick="window.recommendationEditor?.startEditing()"
@@ -196,7 +206,8 @@
                         </button>
                     </div>
 
-                    <table id="recTable">
+                    <div class="llm-table-wrapper">
+                        <table id="recTable">
                         <thead>
                         <tr>
                             <th>Cluster</th>
@@ -212,7 +223,8 @@
                             <td colspan="6">No recommendation</td>
                         </tr>
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
                 <pre class="json-only" id="recJSON">null</pre>
                 <pre class="json-only" id="llmJSON">null</pre>

@@ -139,6 +139,25 @@
     }
   }
 
+  function updateStatus(){
+    const pill = document.getElementById('llmStatusMessage');
+    if (!pill) return;
+    let stateAttr = 'idle';
+    let text = 'Awaiting recommendation';
+    const hasData = hasHosts(state.staged);
+
+    if (state.editing){
+      stateAttr = 'editing';
+      text = 'Editing draft';
+    } else if (hasData){
+      stateAttr = state.dirty ? 'editing' : 'ready';
+      text = state.dirty ? 'Edited locally' : 'Recommendation ready';
+    }
+
+    pill.dataset.state = stateAttr;
+    pill.textContent = text;
+  }
+
   function applyPendingIfIdle(){
     if (!state.pending || state.editing || state.dirty) return;
     const next = state.pending;
@@ -157,6 +176,7 @@
     render();
     updateButtons();
     updateJSON();
+    updateStatus();
   }
 
   function startEditing(){
@@ -165,6 +185,7 @@
     state.editSnapshot = clone(state.staged);
     render();
     updateButtons();
+    updateStatus();
   }
 
   function commitEditing(){
@@ -202,6 +223,7 @@
     render();
     updateButtons();
     updateJSON();
+    updateStatus();
     applyPendingIfIdle();
   }
 
@@ -217,6 +239,7 @@
     render();
     updateButtons();
     updateJSON();
+    updateStatus();
     applyPendingIfIdle();
   }
 
@@ -229,6 +252,7 @@
     state.dirty = false;
     updateButtons();
     updateJSON();
+    updateStatus();
     applyPendingIfIdle();
   }
 
@@ -245,6 +269,6 @@
     markSaved,
     isDirty: () => state.dirty,
     isEditing: () => state.editing,
-    refresh: () => { render(); updateButtons(); updateJSON(); },
+    refresh: () => { render(); updateButtons(); updateJSON(); updateStatus(); },
   };
 })();

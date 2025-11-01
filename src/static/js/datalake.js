@@ -11,6 +11,22 @@
 
   let currentRun = null;
 
+  const PLOT_CONFIG = { displaylogo: false, responsive: true, modeBarButtonsToRemove: ['lasso2d','select2d'] };
+
+  function resolvePalette(){
+    const styles = getComputedStyle(document.documentElement);
+    const read = (token, fallback) => {
+      const raw = styles.getPropertyValue(token);
+      return raw && raw.trim() ? raw.trim() : fallback;
+    };
+    return {
+      text: read('--ink', '#0f172a'),
+      subtle: read('--ink-muted', '#64748b'),
+      grid: read('--hairline', 'rgba(148,163,184,0.25)'),
+      accent: read('--blue', '#3b82f6'),
+    };
+  }
+
   function open(){
     panel.classList.add('open');
     panel.setAttribute('aria-hidden', 'false');
@@ -141,26 +157,51 @@
       el.textContent = 'No data available';
       return;
     }
+    el.textContent = '';
     const x = series.map(point => point && point.timestamp !== undefined ? point.timestamp : null);
     const y = series.map(point => point && point.value !== undefined ? point.value : null);
     const cleanX = _normalizeX(x, y.length);
+    const palette = resolvePalette();
     const trace = {
       type: 'scatter',
       mode: 'lines+markers',
       name: label,
       x: cleanX,
       y: y,
-      line: { color: color || '#4f83ff', width: 2 },
-      marker: { size: 4 },
+      line: { color: color || palette.accent, width: 2.5 },
+      marker: { size: 5, color: color || palette.accent },
     };
-    const layout = Object.assign({
-      margin: { l: 48, r: 16, b: 32, t: 10 },
+    const baseLayout = {
+      margin: { l: 54, r: 18, b: 38, t: 12 },
       paper_bgcolor: 'rgba(0,0,0,0)',
       plot_bgcolor: 'rgba(0,0,0,0)',
-      font: { color: '#fff', size: 12 },
       hovermode: 'closest',
-    }, layoutExtras || {});
-    Plotly.react(el, [trace], layout, { displaylogo: false, responsive: true });
+      font: { color: palette.text, size: 12 },
+      xaxis: {
+        tickfont: { color: palette.subtle },
+        gridcolor: palette.grid,
+        zeroline: false,
+        linecolor: palette.grid,
+      },
+      yaxis: {
+        tickfont: { color: palette.subtle },
+        gridcolor: palette.grid,
+        zeroline: false,
+        linecolor: palette.grid,
+      },
+    };
+
+    if (layoutExtras && typeof layoutExtras === 'object'){
+      Object.entries(layoutExtras).forEach(([key, value]) => {
+        if (key === 'xaxis' || key === 'yaxis'){
+          baseLayout[key] = Object.assign({}, baseLayout[key] || {}, value);
+        } else {
+          baseLayout[key] = value;
+        }
+      });
+    }
+
+    Plotly.react(el, [trace], baseLayout, PLOT_CONFIG);
   }
 
   function formatTimestamp(value){
