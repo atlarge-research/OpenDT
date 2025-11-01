@@ -83,18 +83,28 @@ def api_topology():
 def api_accept_recommendation():
     orchestrator = get_orchestrator()
     try:
-        best_config = orchestrator.state.get('best_config')
-        if not best_config or 'config' not in best_config:
-            return jsonify({'error': 'No recommendation available'}), 400
+        payload = request.get_json(silent=True) or {}
+        proposed = payload.get('topology') if isinstance(payload, dict) else None
 
-        recommended_topology = best_config['config']
+        best_config = orchestrator.state.get('best_config') or {}
+
+        if proposed is not None:
+            recommended_topology = proposed
+        else:
+            if 'config' not in best_config:
+                return jsonify({'error': 'No recommendation available'}), 400
+            recommended_topology = best_config['config']
 
         success = orchestrator.update_topology_file(recommended_topology)
 
         if success:
+            merged = deepcopy(best_config) if isinstance(best_config, dict) else {}
+            merged['config'] = deepcopy(recommended_topology)
+            orchestrator.state['best_config'] = merged
             return jsonify({
                 'message': 'Topology updated successfully with LLM recommendation',
                 'topology_updates': orchestrator.state.get('topology_updates', 0),
+                'applied_config': recommended_topology,
             })
         return jsonify({'error': 'Failed to update topology file'}), 500
 
@@ -120,3 +130,20 @@ def api_sim_timeseries():
     logger.info("Sending opendc results of all time: %s", res)
     res['timestamps'] = deepcopy(res['timestamps'])
     return jsonify(res)
+
+
+@api_bp.route("/datalake/index")
+def api_datalake_index():
+    orchestrator = get_orchestrator()
+    limit = request.args.get("limit", type=int)
+    runs = orchestrator.datalake_overview(limit)
+    return jsonify({'runs': runs})
+
+
+@api_bp.route("/datalake/run/<run_id>")
+def api_datalake_run(run_id: str):
+    orchestrator = get_orchestrator()
+    record = orchestrator.datalake_entry(run_id)
+    if not record:
+        return jsonify({'error': 'run not found'}), 404
+    return jsonify(record)

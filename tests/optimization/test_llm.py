@@ -7,7 +7,7 @@ import types
 
 import pytest
 
-from opendt.optimization.llm import LLM
+from opendt.core.optimization.llm import LLM
 
 
 @pytest.fixture(scope="module")

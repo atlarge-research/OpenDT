@@ -19,11 +19,29 @@ if [ -d /app/src ]; then
 fi
 
 # Ensure the OpenDC runner is executable (covers bind-mount cases)
-RUNNER="/app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"
+OPENDC_ROOT="/app/src/opendt/core/simulation/opendc"
+RUNNER="${OPENDC_ROOT}/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"
+
+if [ ! -f "$RUNNER" ]; then
+  RUNNER="${OPENDC_ROOT}/bin/OpenDCExperimentRunner/OpenDCExperimentRunner"
+fi
+
+if [ ! -f "$RUNNER" ]; then
+  # Legacy fallback for older volume layouts
+  LEGACY_ROOT="/app/opendt-simulator/bin/OpenDCExperimentRunner"
+  if [ -f "${LEGACY_ROOT}/bin/OpenDCExperimentRunner" ]; then
+    RUNNER="${LEGACY_ROOT}/bin/OpenDCExperimentRunner"
+    OPENDC_ROOT="${LEGACY_ROOT}"
+  elif [ -f "${LEGACY_ROOT}/OpenDCExperimentRunner" ]; then
+    RUNNER="${LEGACY_ROOT}/OpenDCExperimentRunner"
+    OPENDC_ROOT="${LEGACY_ROOT}"
+  fi
+fi
+
 if [ -f "$RUNNER" ]; then
   chmod +x "$RUNNER" || true
   # Make sure its directories are traversable
-  chmod -R a+rx "/app/opendt-simulator/bin/OpenDCExperimentRunner" || true
+  chmod -R a+rx "$OPENDC_ROOT" || true
 fi
 
 #give perms to run script

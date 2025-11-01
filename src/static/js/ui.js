@@ -85,20 +85,38 @@ window.submitSLO = submitSLO;
 
 // Recommendation Action
 async function acceptRecommendation() {
+  const btn = $('#btnAcceptRec');
+  if (!btn) return;
+
   try {
-    const btn = $('#btnAcceptRec');
-    if (btn) btn.disabled = true;
+    btn.disabled = true;
+    const topology = window.recommendationEditor?.getTopology() || null;
+    const payload = topology ? { topology } : {};
+
     const response = await fetch('/api/accept_recommendation', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const err = await response.json();
+        detail = err?.error ? `: ${err.error}` : '';
+      } catch(_) { /* ignore JSON parse issues */ }
+      throw new Error(`HTTP ${response.status}${detail}`);
+    }
+
+    if (window.recommendationEditor && typeof window.recommendationEditor.markSaved === 'function') {
+      window.recommendationEditor.markSaved();
+    }
+
     await window.poll();
   } catch(e) {
     console.error('Failed to accept recommendation:', e);
   } finally {
-    const btn = $('#btnAcceptRec');
-    if (btn) btn.disabled = false;
+    btn.disabled = false;
   }
 }
 window.acceptRecommendation = acceptRecommendation;

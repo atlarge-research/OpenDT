@@ -6,7 +6,7 @@ import math
 
 import pandas as pd
 
-from opendt.simulation import adapters
+from opendt.core.simulation import adapters
 
 
 def test_ensure_workload_dir_creates_directory(tmp_path):

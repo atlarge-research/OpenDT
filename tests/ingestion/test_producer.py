@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from opendt.ingestion.kafka.producer import TimedKafkaProducer
+from opendt.adapters.ingestion.kafka.producer import TimedKafkaProducer
 
 
 class DummyProducer:
@@ -31,7 +31,7 @@ def test_tasks_streaming_thread_sends_in_order(monkeypatch):
         {"id": 2, "submission_time": now, "duration": 200, "cpu_count": 4, "cpu_capacity": 3.0, "mem_capacity": 2048},
     ])
 
-    monkeypatch.setattr("opendt.ingestion.kafka.producer.sleep", lambda _: None)
+    monkeypatch.setattr("opendt.adapters.ingestion.kafka.producer.sleep", lambda _: None)
     producer.tasks_streaming_thread(tasks, now)
 
     assert len(producer.producer.messages) == 2
@@ -53,7 +53,7 @@ def test_fragments_streaming_thread_sends(monkeypatch):
         {"id": 1, "submission_time": now, "duration": 60, "cpu_usage": 0.6},
     ])
 
-    monkeypatch.setattr("opendt.ingestion.kafka.producer.sleep", lambda _: None)
+    monkeypatch.setattr("opendt.adapters.ingestion.kafka.producer.sleep", lambda _: None)
     producer.fragments_streaming_thread(frags, now)
 
     assert len(producer.producer.messages) == 2

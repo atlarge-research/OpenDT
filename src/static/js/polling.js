@@ -18,7 +18,7 @@ async function poll(){
     renderMetrics(s);
     renderOpenDC(s.last_optimization || {}, s);
     renderLLM(s.last_optimization || {});
-    renderTopoTable(s.current_topology || null, "topoTable");
+    renderTopoTable(s.current_topology || null, "currentTopoTable", "currentTopologyJSON");
     //console.log(s);
     renderBest(s.best_config || null);
   }catch(e){}

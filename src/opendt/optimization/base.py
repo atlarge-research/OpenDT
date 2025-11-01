@@ -1,9 +1,3 @@
-"""Base protocol for optimization strategies."""
-from __future__ import annotations
+"""Compatibility proxy for the base optimizer interfaces."""
 
-from typing import Protocol
-
-
-class OptimizationStrategy(Protocol):
-    def optimize(self, simulation_results, batch_data, slo_targets, current_topology=None):
-        ...
+from opendt.core.optimization.base import *  # noqa: F401,F403
