@@ -12,6 +12,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from .adapters import ensure_workload_dir, fragments_to_table, tasks_to_table
+from .opendc import SIMULATOR_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -20,41 +21,43 @@ class OpenDCRunner:
     """OpenDC ExperimentRunner with comprehensive path detection and diagnostics."""
 
     def __init__(self) -> None:
+        package_root = SIMULATOR_ROOT
         possible_paths = [
-            "/app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner",
-            "/app/opendt-simulator/bin/OpenDCExperimentRunner/OpenDCExperimentRunner",
-            "/app/opendc/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner",
-            "/app/opendc/bin/OpenDCExperimentRunner/OpenDCExperimentRunner",
-            "./opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner",
+            package_root / "bin" / "OpenDCExperimentRunner" / "bin" / "OpenDCExperimentRunner",
+            package_root / "bin" / "OpenDCExperimentRunner" / "OpenDCExperimentRunner",
+            Path("/app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"),
+            Path("/app/opendt-simulator/bin/OpenDCExperimentRunner/OpenDCExperimentRunner"),
+            Path("/app/opendc/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"),
+            Path("/app/opendc/bin/OpenDCExperimentRunner/OpenDCExperimentRunner"),
+            Path("./opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"),
         ]
 
         self.opendc_path: str | None = None
 
         logger.info("🔍 Searching for OpenDC runner...")
-        for path in possible_paths:
-            candidate = Path(path)
-            logger.info("Checking: %s", path)
+        for candidate in possible_paths:
+            logger.info("Checking: %s", candidate)
             logger.info("  - Exists: %s", candidate.exists())
             if not candidate.exists():
                 continue
 
             if candidate.is_file():
-                if os.access(path, os.X_OK):
-                    self.opendc_path = path
-                    logger.info("✅ Found executable OpenDC runner: %s", path)
+                if os.access(candidate, os.X_OK):
+                    self.opendc_path = str(candidate)
+                    logger.info("✅ Found executable OpenDC runner: %s", candidate)
                     break
-                logger.warning("⚠️ OpenDC found but not executable, fixing perms: %s", path)
+                logger.warning("⚠️ OpenDC found but not executable, fixing perms: %s", candidate)
                 try:
-                    os.chmod(path, 0o755)
-                    if os.access(path, os.X_OK):
-                        self.opendc_path = path
-                        logger.info("✅ Fixed permissions for OpenDC runner: %s", path)
+                    os.chmod(candidate, 0o755)
+                    if os.access(candidate, os.X_OK):
+                        self.opendc_path = str(candidate)
+                        logger.info("✅ Fixed permissions for OpenDC runner: %s", candidate)
                         break
                 except Exception as exc:  # pragma: no cover - defensive logging path
                     logger.error("❌ Failed to chmod OpenDC runner: %s", exc)
 
         logger.info("📁 Directory structure:")
-        for base in ["/app/opendt-simulator", "/app/opendc"]:
+        for base in [package_root, Path("/app/opendt-simulator"), Path("/app/opendc")]:
             if Path(base).exists():
                 logger.info("Contents of %s:", base)
                 try:
