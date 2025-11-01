@@ -1,11 +1,23 @@
 """Unit tests for the LLM optimization strategies and topology translation."""
 
 import json
+import os
 import sys
+import types
 
 import pytest
 
 from opendt.optimization.llm import LLM
+
+
+@pytest.fixture(scope="module")
+def openai_key():
+    """Return the configured OpenAI API key so tests exercise the real credential."""
+
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY must be set for LLM integration tests")
+    return key
 
 
 def sample_topology():
@@ -73,9 +85,9 @@ def test_rule_based_returns_best_config_snapshot():
     assert result["best_score"] == pytest.approx(optimizer.best_score)
 
 
-def test_convert_llm_to_topology_adds_hosts():
+def test_convert_llm_to_topology_adds_hosts(openai_key):
     """Ensure LLM recommendations are merged as new hosts into the topology."""
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
     topology = sample_topology()
     rec = type("Obj", (), {
         "cluster_name": ["C01", "C02"],
@@ -93,9 +105,9 @@ def test_convert_llm_to_topology_adds_hosts():
     assert host_counts == [1, 2]
 
 
-def test_extract_text_content_handles_structured_payloads():
+def test_extract_text_content_handles_structured_payloads(openai_key):
     """The helper should flatten LangChain message payloads into a JSON string."""
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
 
     message = type(
         "Message",
@@ -113,10 +125,10 @@ def test_extract_text_content_handles_structured_payloads():
     assert flattened == '{"foo": "bar"}'
 
 
-def test_llm_optimization_parses_ai_message_list(monkeypatch):
+def test_llm_optimization_parses_ai_message_list(monkeypatch, openai_key):
     """LLM.optimize should parse structured AIMessage content returned by LangChain."""
 
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
     topology = sample_topology()
     sim_results = {"energy_kwh": 9.0, "runtime_hours": 1.2, "cpu_utilization": 0.5}
     batch = {"task_count": 4, "fragment_count": 12, "avg_cpu_usage": 0.4}
@@ -132,10 +144,11 @@ def test_llm_optimization_parses_ai_message_list(monkeypatch):
 
     class DummyChatModule:
         class ChatOpenAI:  # noqa: D401 - simple stub for tests
-            def __init__(self, *args, **kwargs):  # pragma: no cover - trivial
-                pass
+            def __init__(self, *_, api_key=None, **__):  # pragma: no cover - trivial
+                assert api_key == openai_key
 
             def invoke(self, prompt):  # pragma: no cover - simple deterministic stub
+                assert "SIMULATION RESULTS" in prompt
                 return type(
                     "AIMessage",
                     (),
@@ -147,6 +160,22 @@ def test_llm_optimization_parses_ai_message_list(monkeypatch):
                 )()
 
     monkeypatch.setitem(sys.modules, "langchain_openai", DummyChatModule)
+    monkeypatch.setitem(sys.modules, "langchain_core", types.ModuleType("langchain_core"))
+    parser_module = types.ModuleType("langchain_core.output_parsers")
+
+    class DummyParser:
+        def __init__(self, pydantic_object):  # pragma: no cover - simple stub
+            self._model = pydantic_object
+
+        def get_format_instructions(self):  # pragma: no cover - simple stub
+            return "Return a JSON object with topology recommendations."
+
+        def parse(self, content):  # pragma: no cover - simple stub
+            data = json.loads(content)
+            return self._model(**data)
+
+    parser_module.JsonOutputParser = DummyParser
+    monkeypatch.setitem(sys.modules, "langchain_core.output_parsers", parser_module)
 
     result = optimizer.llm_optimization(sim_results, batch, slo, current_topology=topology)
 
@@ -173,10 +202,10 @@ def test_optimize_without_key_returns_rule_based():
     assert optimizer.best_config is None
 
 
-def test_optimize_falls_back_when_llm_errors(monkeypatch):
+def test_optimize_falls_back_when_llm_errors(monkeypatch, openai_key):
     """If the LLM call fails the optimizer should gracefully fall back to the rule-based plan."""
 
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
 
     def explode(*_args, **_kwargs):
         raise RuntimeError("boom")
@@ -194,10 +223,10 @@ def test_optimize_falls_back_when_llm_errors(monkeypatch):
     assert fallback["reason"].startswith("LLM Error: boom")
 
 
-def test_convert_llm_to_topology_updates_existing_host():
+def test_convert_llm_to_topology_updates_existing_host(openai_key):
     """Existing topology entries should be updated rather than duplicated."""
 
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
     topology = sample_topology()
 
     recommendations = {
@@ -216,10 +245,10 @@ def test_convert_llm_to_topology_updates_existing_host():
     assert host["cpu"]["coreSpeed"] == 2600
 
 
-def test_convert_llm_to_topology_uses_defaults_for_missing_fields():
+def test_convert_llm_to_topology_uses_defaults_for_missing_fields(openai_key):
     """Missing optional recommendation fields should fall back to sensible defaults."""
 
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
     original = {"clusters": []}
     rec = {
         "cluster_name": ["C07"],
@@ -237,10 +266,10 @@ def test_convert_llm_to_topology_uses_defaults_for_missing_fields():
     assert host["cpu"]["coreSpeed"] == 2400
 
 
-def test_update_best_configuration_only_on_improvement():
+def test_update_best_configuration_only_on_improvement(openai_key):
     """Only better performance scores should replace the stored best configuration."""
 
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
     initial = sample_topology()
     worse = {"clusters": [{"name": "C99", "hosts": []}]}
 
@@ -255,10 +284,10 @@ def test_update_best_configuration_only_on_improvement():
     assert optimizer.best_score == pytest.approx(13.0)
 
 
-def test_extract_text_content_handles_non_list_payloads():
+def test_extract_text_content_handles_non_list_payloads(openai_key):
     """Extractor should gracefully process raw strings and mapping-based payloads."""
 
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
 
     assert optimizer._extract_text_content("  hello \n") == "hello"
 
@@ -266,10 +295,10 @@ def test_extract_text_content_handles_non_list_payloads():
     assert optimizer._extract_text_content(message) == "{'text': 'ignored', 'other': 1}"
 
 
-def test_extract_text_content_handles_empty_message():
+def test_extract_text_content_handles_empty_message(openai_key):
     """Empty or None messages should result in an empty string."""
 
-    optimizer = LLM(openai_key="dummy")
+    optimizer = LLM(openai_key=openai_key)
 
     assert optimizer._extract_text_content(None) == ""
     blank_message = type("Message", (), {"content": []})()
