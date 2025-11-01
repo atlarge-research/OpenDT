@@ -15,6 +15,9 @@ if str(SRC) not in sys.path:
 
 fake_kafka = types.ModuleType("kafka")
 
+fake_dotenv = types.ModuleType("dotenv")
+fake_dotenv.load_dotenv = lambda *args, **kwargs: None
+
 
 class _KafkaProducer:
     """Minimal KafkaProducer stub used to satisfy orchestrator imports."""
@@ -41,6 +44,7 @@ fake_kafka.KafkaProducer = _KafkaProducer
 fake_kafka.KafkaConsumer = _KafkaConsumer
 
 sys.modules.setdefault("kafka", fake_kafka)
+sys.modules.setdefault("dotenv", fake_dotenv)
 
 from opendt.api.dependencies import get_orchestrator
 

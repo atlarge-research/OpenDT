@@ -123,48 +123,10 @@
     <!-- Detail cards -->
     <section class="section-columns">
         <section class="section-stack">
-            <!-- LLM Recommendation -->
-            <div class="card glass lift">
-                <div class="ui-only">
-                    <h3>🤖LLM Recommendation</h3>
-                    <div class="kv">
-                        <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
-                        <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
-                    </div>
-
-                    <div class="ui-only">
-                        <table id="recTable">
-                            <thead>
-                            <tr>
-                                <th>Cluster</th>
-                                <th>Host</th>
-                                <th>Count</th>
-                                <th>Cores</th>
-                                <th>Clock (MHz)</th>
-                                <th>Memory (GiB)</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr>
-                                <td colspan="6">No topology</td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <pre class="json-only" id="topologyJSON">null</pre>
-                    <button id="accept-recommendation-btn"
-                            class="btn btn-success"
-                            onclick="acceptRecommendation()">
-                        Accept Recommendation
-                    </button>
-                </div>
-                <pre class="json-only" id="llmJSON">null</pre>
-            </div>
-
             <div class="card glass lift">
                 <h3>🗺️ Current Topology</h3>
                 <div class="ui-only">
-                    <table id="topoTable">
+                    <table id="currentTopoTable">
                         <thead>
                         <tr>
                             <th>Cluster</th>
@@ -182,12 +144,76 @@
                         </tbody>
                     </table>
                 </div>
-                <pre class="json-only" id="topologyJSON">null</pre>
+                <pre class="json-only" id="currentTopologyJSON">null</pre>
+            </div>
+
+            <!-- LLM Recommendation -->
+            <div class="card glass lift">
+                <div class="ui-only">
+                    <h3>🤖 LLM Suggested Topology</h3>
+                    <div class="kv">
+                        <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
+                        <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
+                        <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
+                    </div>
+                    <p class="llm-reason" id="kvLLMReason">—</p>
+
+                    <div class="rec-actions">
+                        <button id="btnAcceptRec"
+                                class="btn btn-success"
+                                onclick="acceptRecommendation()"
+                                disabled>
+                            <span class="icon" style="--icon-url:var(--sym-check)"></span>&nbsp;Accept Recommendation
+                        </button>
+                        <button id="btnEditRec"
+                                class="btn btn-secondary"
+                                onclick="window.recommendationEditor?.startEditing()"
+                                disabled>
+                            <span class="icon" style="--icon-url:var(--sym-edit)"></span>&nbsp;Edit Recommendation
+                        </button>
+                        <button id="btnConfirmRec"
+                                class="btn btn-success"
+                                onclick="window.recommendationEditor?.commitEditing()"
+                                hidden
+                                title="Apply edits"
+                                aria-label="Apply edits">
+                            ✔
+                        </button>
+                        <button id="btnCancelRec"
+                                class="btn btn-danger"
+                                onclick="window.recommendationEditor?.cancelEditing()"
+                                hidden
+                                title="Discard edits"
+                                aria-label="Discard edits">
+                            ✖
+                        </button>
+                    </div>
+
+                    <table id="recTable">
+                        <thead>
+                        <tr>
+                            <th>Cluster</th>
+                            <th>Host</th>
+                            <th>Count</th>
+                            <th>Cores</th>
+                            <th>Clock (MHz)</th>
+                            <th>Memory (GiB)</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td colspan="6">No recommendation</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre class="json-only" id="recJSON">null</pre>
+                <pre class="json-only" id="llmJSON">null</pre>
             </div>
 
             <!-- OpenDC Results -->
             <div class="card glass lift">
-                <h3>📈LLM-Recommended Infrastructure (simulated) </h3>
+                <h3>📈 LLM Suggested Topology (simulated)</h3>
                 <div class="ui-only">
                     <div class="kv">
                         <div><span>Energy [kWh]</span><strong id="kvEnergy">—</strong></div>
@@ -235,6 +261,7 @@
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 
 <script src="/static/js/utils.js"></script>
+<script src="/static/js/recommendations.js"></script>
 <script src="/static/js/ui.js"></script>
 <script src="/static/js/render.js"></script>
 <script src="/static/js/charts.js"></script>

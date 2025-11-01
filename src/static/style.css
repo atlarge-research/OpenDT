@@ -204,6 +204,8 @@ body{
   --sym-topo:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22"><circle cx="11" cy="5" r="2"/><circle cx="6" cy="15" r="2"/><circle cx="16" cy="15" r="2"/><path d="M11 7v4M9 11l-2 2M13 11l2 2" stroke="black" stroke-width="2" fill="none" stroke-linecap="round"/></svg>');
   --sym-wand:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22"><path d="M3 19l8-8 2 2-8 8z"/><path d="M14 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z"/></svg>');
   --sym-chart:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22"><rect x="4" y="12" width="3" height="6"/><rect x="9" y="9" width="3" height="9"/><rect x="14" y="6" width="3" height="12"/></svg>');
+  --sym-check:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22"><path d="M4.5 11.5l4.3 4.3 8.7-8.7" fill="none" stroke="black" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  --sym-edit:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22"><path d="M4 14.5V18h3.5L17 8.5 13.5 5 4 14.5z"/><path d="M12.8 5.7l3.5 3.5" fill="none" stroke="black" stroke-width="2" stroke-linecap="round"/></svg>');
 }
 
 /* 6) Status + segmented control */
@@ -377,6 +379,14 @@ tbody td{background:var(--row-bg); padding:12px 12px; border-top:1px solid var(-
 tbody tr td:first-child{border-top-left-radius:12px; border-bottom-left-radius:12px}
 tbody tr td:last-child{border-top-right-radius:12px; border-bottom-right-radius:12px}
 tbody tr:hover td{background:color-mix(in srgb, var(--row-bg) 85%, white 15%)}
+
+.rec-actions{display:flex; gap:10px; margin:16px 0 12px; flex-wrap:wrap; align-items:center}
+.rec-actions .btn{flex:0 0 auto}
+.rec-edit-input{width:100%; padding:8px 10px; border-radius:10px; border:1px solid var(--hairline); background:var(--surface-strong); color:inherit; font:inherit}
+.rec-edit-input:focus{border-color:color-mix(in srgb, var(--blue) 65%, white 35%); box-shadow:0 0 0 3px color-mix(in srgb, var(--blue) 30%, transparent 70%)}
+.llm-reason{margin:14px 0 6px; color:var(--ink-muted); line-height:1.45}
+.llm-reason.placeholder{opacity:.7; font-style:italic}
+.rec-table-editing tbody td{background:color-mix(in srgb, var(--row-bg) 80%, white 20%)}
 
 /* 9) JSON mode */
 .json-only{display:none; white-space:pre-wrap; background:var(--code-bg); color:var(--code-ink); border-radius:12px; padding:14px; border:1px solid rgba(255,255,255,.08); box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}

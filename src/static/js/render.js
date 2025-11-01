@@ -32,7 +32,7 @@ function renderOpenDC(sim,s){
   if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
-function renderTopoTable(topo, id){
+function renderTopoTable(topo, id, jsonId){
   const body = $(`#${id} tbody`);
   if (!body) return;
   const rows = [];
@@ -55,19 +55,27 @@ function renderTopoTable(topo, id){
   }catch(e){}
   body.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6">No topology</td></tr>';
 
-  const pre = $('#topologyJSON');
+  const preId = jsonId || `${id}JSON`;
+  const pre = $(`#${preId}`);
   const txt = JSON.stringify(topo || null, null, 2);
   if (pre && pre.textContent !== txt) pre.textContent = txt;
 }
 
 function renderLLM(opt){
   $('#kvLLMAction')   && ($('#kvLLMAction').textContent = opt.action_taken || '—');
-  $('#kvLLMReason')   && ($('#kvLLMReason').textContent = opt.reason || '—');
+  const reasonEl = $('#kvLLMReason');
+  if (reasonEl){
+    const reason = opt.reason || '—';
+    reasonEl.textContent = reason;
+    reasonEl.classList.toggle('placeholder', reason === '—');
+  }
   $('#kvLLMPriority') && ($('#kvLLMPriority').textContent = opt.priority || '—');
   $('#kvLLMType')     && ($('#kvLLMType').textContent     = (opt.type || '—').replace('_',' '));
 
-  const recs = opt.recommendations || opt.llm_recommendation || [];
-  renderTopoTable(recs, "recTable");
+  const recommended = opt.new_topology || opt.best_config?.config || null;
+  if (window.recommendationEditor && typeof window.recommendationEditor.ingest === 'function'){
+    window.recommendationEditor.ingest(recommended);
+  }
 
   const pre = $('#llmJSON');
   const txt = JSON.stringify(opt || null, null, 2);
