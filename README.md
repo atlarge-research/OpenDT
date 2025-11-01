@@ -15,6 +15,19 @@ docker-compose up --build
 
 Then, open http://localhost:8080 for the orchestrator UI.
 
+## Project Layout
+
+The Python package has been consolidated into two high-level namespaces:
+
+- `opendt.core` holds orchestrator logic, simulation utilities, optimization
+  strategies, and worker helpers that make up the core runtime.
+- `opendt.adapters` contains infrastructure integrations such as Kafka
+  ingestion clients.
+
+The legacy import paths (for example `opendt.orchestrator` and
+`opendt.simulation`) remain available as thin compatibility shims so existing
+code continues to run without modification.
+
 ## Running the Test Suite
 
 The test harness mirrors production by running inside the Docker Compose stack. From the project root run:

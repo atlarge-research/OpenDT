@@ -9,7 +9,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from opendt.simulation.runner import OpenDCRunner
+from opendt.core.simulation.runner import OpenDCRunner
 
 
 def test_create_workload_writes_parquet(tmp_path, monkeypatch):
@@ -55,7 +55,7 @@ def test_create_workload_handles_missing_payload(tmp_path, monkeypatch):
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir
 
-    monkeypatch.setattr("opendt.simulation.runner.ensure_workload_dir", _ensure_dir)
+    monkeypatch.setattr("opendt.core.simulation.runner.ensure_workload_dir", _ensure_dir)
 
     workload_dir = Path(runner.create_workload(None, None))
 
@@ -106,7 +106,7 @@ def test_run_simulation_surfaces_process_failures(tmp_path, monkeypatch):
 
         return Result()
 
-    monkeypatch.setattr("opendt.simulation.runner.subprocess.run", fake_run)
+    monkeypatch.setattr("opendt.core.simulation.runner.subprocess.run", fake_run)
 
     with pytest.raises(RuntimeError) as exc:
         runner.run_simulation(tasks_data=None, fragments_data=None, topology_data={})
@@ -129,7 +129,7 @@ def test_run_simulation_invokes_runner_with_expected_arguments(tmp_path, monkeyp
     workload_dir = tmp_path / "workload"
     workload_dir.mkdir()
 
-    monkeypatch.setattr("opendt.simulation.runner.ensure_workload_dir", lambda: workload_dir)
+    monkeypatch.setattr("opendt.core.simulation.runner.ensure_workload_dir", lambda: workload_dir)
 
     recorded: dict[str, Any] = {}
 
@@ -147,7 +147,7 @@ def test_run_simulation_invokes_runner_with_expected_arguments(tmp_path, monkeyp
 
         return Result()
 
-    monkeypatch.setattr("opendt.simulation.runner.subprocess.run", fake_run)
+    monkeypatch.setattr("opendt.core.simulation.runner.subprocess.run", fake_run)
     monkeypatch.setattr(
         runner,
         "parse_opendc_results",

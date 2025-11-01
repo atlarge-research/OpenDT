@@ -1,8 +1,3 @@
-"""Task helpers for background orchestration jobs."""
-from __future__ import annotations
+"""Compatibility proxy for worker task helpers."""
 
-from typing import Callable
-
-
-def run_task(task: Callable[[], None]) -> None:
-    task()
+from opendt.core.workers.tasks import *  # noqa: F401,F403

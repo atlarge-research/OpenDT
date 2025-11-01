@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from opendt.orchestrator.controller import OpenDTOrchestrator
+from opendt.core.orchestrator.controller import OpenDTOrchestrator
 
 
 @pytest.fixture

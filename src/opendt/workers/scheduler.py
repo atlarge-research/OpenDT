@@ -1,11 +1,3 @@
-"""Utilities for spawning background worker threads."""
-from __future__ import annotations
+"""Compatibility proxy for worker scheduling helpers."""
 
-import threading
-from typing import Callable
-
-
-def start_thread(target: Callable[[], None], *, daemon: bool = False) -> threading.Thread:
-    thread = threading.Thread(target=target, daemon=daemon)
-    thread.start()
-    return thread
+from opendt.core.workers.scheduler import *  # noqa: F401,F403
