@@ -130,3 +130,20 @@ def api_sim_timeseries():
     logger.info("Sending opendc results of all time: %s", res)
     res['timestamps'] = deepcopy(res['timestamps'])
     return jsonify(res)
+
+
+@api_bp.route("/datalake/index")
+def api_datalake_index():
+    orchestrator = get_orchestrator()
+    limit = request.args.get("limit", type=int)
+    runs = orchestrator.datalake_overview(limit)
+    return jsonify({'runs': runs})
+
+
+@api_bp.route("/datalake/run/<run_id>")
+def api_datalake_run(run_id: str):
+    orchestrator = get_orchestrator()
+    record = orchestrator.datalake_entry(run_id)
+    if not record:
+        return jsonify({'error': 'run not found'}), 404
+    return jsonify(record)

@@ -66,6 +66,13 @@
                 </div>
             </div>
 
+            <button id="btnDataLake"
+                    class="btn btn-secondary"
+                    type="button"
+                    onclick="window.dataLake?.open()">
+                <span class="icon" style="--icon-url:var(--sym-datalake)"></span>&nbsp;Data Lake
+            </button>
+
         </div>
     </section>
 
@@ -258,6 +265,94 @@
     {#        <pre class="json-only" id="bestJSON">null</pre>#}
     {#    </section>#}</div> <!-- /.container -->
 
+<div id="datalakePanel" class="datalake-panel" aria-hidden="true">
+    <div class="datalake-card glass lift">
+        <header class="datalake-header">
+            <h2>📚 Data Lake Explorer</h2>
+            <button id="btnCloseDatalake"
+                    class="btn btn-secondary btn-icon"
+                    type="button"
+                    onclick="window.dataLake?.close()"
+                    aria-label="Close data lake">
+                ✕
+            </button>
+        </header>
+        <div class="datalake-body">
+            <aside class="datalake-sidebar">
+                <div class="datalake-list-header">
+                    <h3>Simulation Runs</h3>
+                    <button id="btnRefreshDatalake"
+                            class="btn btn-secondary btn-icon"
+                            type="button"
+                            onclick="window.dataLake?.refresh()"
+                            aria-label="Refresh data lake">
+                        ↻
+                    </button>
+                </div>
+                <div class="datalake-table-wrapper">
+                    <table id="datalakeTable">
+                        <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Type</th>
+                            <th>Energy</th>
+                            <th>Runtime</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr><td colspan="4">No runs recorded</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </aside>
+            <section class="datalake-detail">
+                <div class="datalake-metrics" id="datalakeMetrics">
+                    <div class="metric-card">
+                        <span>Energy [kWh]</span>
+                        <strong data-key="energy_kwh">—</strong>
+                    </div>
+                    <div class="metric-card">
+                        <span>CPU Util [%]</span>
+                        <strong data-key="cpu_utilization">—</strong>
+                    </div>
+                    <div class="metric-card">
+                        <span>Runtime [h]</span>
+                        <strong data-key="runtime_hours">—</strong>
+                    </div>
+                    <div class="metric-card">
+                        <span>Max Power</span>
+                        <strong data-key="max_power_draw">—</strong>
+                    </div>
+                    <div class="metric-card">
+                        <span>Status</span>
+                        <strong data-key="status">—</strong>
+                    </div>
+                </div>
+
+                <div class="datalake-plots">
+                    <div class="datalake-chart">
+                        <h4>Power Draw</h4>
+                        <div id="datalakePowerChart" class="chart"></div>
+                    </div>
+                    <div class="datalake-chart">
+                        <h4>CPU Utilization</h4>
+                        <div id="datalakeCPUChart" class="chart"></div>
+                    </div>
+                    <div class="datalake-chart">
+                        <h4>Service Timeline</h4>
+                        <div id="datalakeServiceChart" class="chart"></div>
+                    </div>
+                </div>
+
+                <div class="datalake-topology">
+                    <h4>Topology Snapshot</h4>
+                    <pre id="datalakeTopology">Select a run to view topology.</pre>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 
 <script src="/static/js/utils.js"></script>
@@ -266,6 +361,7 @@
 <script src="/static/js/render.js"></script>
 <script src="/static/js/charts.js"></script>
 <script src="/static/js/polling.js"></script>
+<script src="/static/js/datalake.js"></script>
 <script src="/static/js/boot.js"></script>
 
 <script>

@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -183,6 +184,8 @@ class OpenDCRunner:
             ]
 
             power_df = host_df = service_df = None
+            source_dir: Path | None = None
+            artifacts: dict[str, Path] = {}
             for odir in output_dirs:
                 if not odir.exists():
                     continue
@@ -191,11 +194,15 @@ class OpenDCRunner:
                 sfile = odir / "service.parquet"
                 if pfile.exists():
                     power_df = pd.read_parquet(pfile)
+                    artifacts["powerSource"] = pfile
                 if hfile.exists():
                     host_df = pd.read_parquet(hfile)
+                    artifacts["host"] = hfile
                 if sfile.exists():
                     service_df = pd.read_parquet(sfile)
-                if power_df is not None or host_df is not None:
+                    artifacts["service"] = sfile
+                if power_df is not None or host_df is not None or service_df is not None:
+                    source_dir = odir
                     break
 
             if power_df is not None and len(power_df) > 0:
@@ -215,12 +222,22 @@ class OpenDCRunner:
             else:
                 runtime_hours = 0.0
 
+            timeseries = {
+                "power_draw": _slice_frame(power_df, value="power_draw"),
+                "energy_usage": _slice_frame(power_df, value="energy_usage"),
+                "cpu_utilization": _slice_frame(host_df, value="cpu_utilization"),
+                "service_timestamps": _slice_frame(service_df, value="timestamp"),
+            }
+
             return {
                 "energy_kwh": round(float(energy_kwh), 4),
                 "cpu_utilization": round(float(cpu_util), 3),
                 "max_power_draw": round(float(max_power), 1),
                 "runtime_hours": round(float(runtime_hours), 2),
                 "status": "success",
+                "timeseries": timeseries,
+                "artifacts": {name: str(path) for name, path in artifacts.items()},
+                "raw_output_dir": str(source_dir) if source_dir else None,
             }
         except Exception as exc:  # pragma: no cover - defensive logging path
             logger.error("Failed to parse OpenDC results: %s", exc)
@@ -230,5 +247,70 @@ class OpenDCRunner:
                 "max_power_draw": 0.0,
                 "runtime_hours": 0.0,
                 "status": "error",
+                "timeseries": {},
+                "artifacts": {},
+                "raw_output_dir": None,
             }
+
+
+def _slice_frame(
+    frame: pd.DataFrame | None,
+    *,
+    value: str,
+    timestamp_col: str = "timestamp",
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    if frame is None or value not in frame.columns:
+        return []
+
+    records: list[dict[str, Any]] = []
+    subset = frame.head(limit)
+    for idx, row in subset.iterrows():
+        raw_value = row.get(value)
+        numeric = _safe_number(raw_value)
+        if numeric is None:
+            continue
+
+        ts_value = None
+        if timestamp_col in row:
+            ts_value = _format_timestamp(row[timestamp_col], idx)
+        else:
+            ts_value = idx
+
+        records.append({"timestamp": ts_value, "value": numeric})
+
+    return records
+
+
+def _format_timestamp(value: Any, fallback: int) -> str | int:
+    if isinstance(value, pd.Timestamp):
+        ts = value.tz_convert(timezone.utc) if value.tzinfo else value.tz_localize(timezone.utc)
+        return ts.isoformat()
+
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc).isoformat()
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, (int, float)):
+        try:
+            if value > 1e12:  # assume milliseconds
+                dt = datetime.fromtimestamp(value / 1000.0, tz=timezone.utc)
+                return dt.isoformat()
+            if value > 1e9:  # assume seconds
+                dt = datetime.fromtimestamp(value, tz=timezone.utc)
+                return dt.isoformat()
+        except Exception:  # pragma: no cover - defensive conversion
+            return fallback
+    return fallback
+
+
+def _safe_number(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except Exception:  # pragma: no cover - defensive conversion
+        return None
 

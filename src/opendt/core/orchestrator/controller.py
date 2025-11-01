@@ -5,7 +5,9 @@ import logging
 import threading
 import time
 from copy import deepcopy
-from typing import Any
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping
 
 from ...config import loaders
 from ...config.settings import (
@@ -18,6 +20,7 @@ from ...config.settings import (
 )
 from ...adapters.ingestion.kafka.consumer import DigitalTwinConsumer
 from ...adapters.ingestion.kafka.producer import TimedKafkaProducer
+from ..datalake import DataLake
 from ..optimization.llm import LLM
 from .state import SimulationResultsBuffer, default_state_dict
 from ..simulation.runner import OpenDCRunner
@@ -40,6 +43,7 @@ class OpenDTOrchestrator:
         self.consumer: DigitalTwinConsumer | None = None
         self.opendc_runner = OpenDCRunner()
         self.optimizer = LLM(self.openai_key)
+        self.datalake = DataLake()
 
         self.stop_event = threading.Event()
         self.producer_thread: threading.Thread | None = None
@@ -180,6 +184,62 @@ class OpenDTOrchestrator:
         with self.open_dc_buffer.lock:
             return list(self.open_dc_buffer.results)
 
+    def _record_datalake(
+        self,
+        *,
+        run_type: str,
+        result: Mapping[str, Any],
+        topology: dict[str, Any] | None,
+        metadata: dict[str, Any] | None,
+        timeseries: Mapping[str, Any] | None,
+        artifacts: Mapping[str, Any] | None,
+        window_id: str | None,
+        cycle: int | None,
+        attempt: int | None,
+        exp_name: str | None,
+        score: float | None,
+        timestamp: datetime | None = None,
+    ) -> None:
+        try:
+            metrics_payload = {
+                "energy_kwh": result.get("energy_kwh"),
+                "cpu_utilization": result.get("cpu_utilization"),
+                "runtime_hours": result.get("runtime_hours"),
+                "max_power_draw": result.get("max_power_draw"),
+                "status": result.get("status", "unknown"),
+            }
+
+            metadata_payload = dict(metadata or {})
+            if result.get("raw_output_dir") and "raw_output_dir" not in metadata_payload:
+                metadata_payload["raw_output_dir"] = result.get("raw_output_dir")
+
+            artifact_paths: dict[str, Path] = {}
+            artifact_source = artifacts or result.get("artifacts") or {}
+            for name, candidate in artifact_source.items():
+                if not candidate:
+                    continue
+                try:
+                    artifact_paths[name] = Path(candidate)
+                except TypeError:
+                    continue
+
+            self.datalake.append_run(
+                run_type=run_type,
+                metrics=metrics_payload,
+                topology=topology,
+                metadata=metadata_payload,
+                timeseries=timeseries or result.get("timeseries") or {},
+                artifacts=artifact_paths,
+                window_id=window_id,
+                cycle=cycle,
+                attempt=attempt,
+                exp_name=exp_name,
+                timestamp=timestamp,
+                score=score,
+            )
+        except Exception as exc:  # pragma: no cover - defensive persistence
+            logger.warning("Failed to persist run to data lake: %s", exc)
+
     def run_consumer(self) -> None:
         try:
             logger.info("📥 Starting digital twin consumer...")
@@ -191,9 +251,20 @@ class OpenDTOrchestrator:
                 self.state["current_window"] = batch_data.get("window_info", "Processing...")
                 logger.info("🔄 Processing cycle %s", cycle)
 
-                baseline = self.run_simulation(batch_data)
+                window_dt = batch_data.get("window_end")
+                window_iso = None
+                if isinstance(window_dt, datetime):
+                    aware = window_dt if window_dt.tzinfo else window_dt.replace(tzinfo=timezone.utc)
+                    window_dt = aware
+                    window_iso = aware.isoformat()
+                    timestamp = aware.strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    timestamp = str(window_dt)
+                    window_iso = timestamp if window_dt is not None else None
 
-                timestamp = batch_data["window_end"].strftime("%Y-%m-%dT%H:%M:%SZ")
+                baseline_exp = f"window_{cycle}_baseline"
+                baseline = self.run_simulation(batch_data, expName=baseline_exp)
+
                 self._append_simulation_result(baseline, timestamp)
 
                 self.state["last_simulation"] = baseline
@@ -206,6 +277,27 @@ class OpenDTOrchestrator:
                         "window_trials": 0,
                         "window_accepted": False,
                     }
+                )
+
+                baseline_metadata = {
+                    "window_start": _stringify(batch_data.get("window_start")),
+                    "window_end": window_iso,
+                    "window_info": batch_data.get("window_info"),
+                }
+
+                self._record_datalake(
+                    run_type="baseline",
+                    result=baseline,
+                    topology=self.state.get("current_topology"),
+                    metadata=baseline_metadata,
+                    timeseries=baseline.get("timeseries"),
+                    artifacts=baseline.get("artifacts"),
+                    window_id=window_iso,
+                    cycle=cycle,
+                    attempt=0,
+                    exp_name=baseline_exp,
+                    score=baseline_score,
+                    timestamp=window_dt,
                 )
 
                 best_topology = self.state.get("current_topology")
@@ -235,11 +327,12 @@ class OpenDTOrchestrator:
                         continue
                     seen.add(topo_hash)
 
+                    probe_exp = f"window_{cycle}_try_{tries}"
                     probe = self.opendc_runner.run_simulation(
                         tasks_data=batch_data.get("tasks_sample", []),
                         fragments_data=batch_data.get("fragments_sample", []),
                         topology_data=proposed,
-                        expName=f"window_{cycle}_try_{tries}",
+                        expName=probe_exp,
                     )
 
                     self.state["last_optimization"] = opt
@@ -250,6 +343,26 @@ class OpenDTOrchestrator:
 
                     self.state["cycle_count_opt"] += 1
                     score = self._score(probe)
+                    opt_metadata = {
+                        "window_end": window_iso,
+                        "attempt": tries,
+                        "recommended_by": self.state.get("last_optimization", {}).get("type"),
+                    }
+
+                    self._record_datalake(
+                        run_type="optimization",
+                        result=probe,
+                        topology=proposed,
+                        metadata=opt_metadata,
+                        timeseries=probe.get("timeseries"),
+                        artifacts=probe.get("artifacts"),
+                        window_id=window_iso,
+                        cycle=cycle,
+                        attempt=tries,
+                        exp_name=probe_exp,
+                        score=score,
+                        timestamp=window_dt,
+                    )
                     if score < best_score - IMPROVEMENT_DELTA:
                         best_topology, best_score = proposed, score
                         self.state["window_best_score"] = round(best_score, 3)
@@ -290,3 +403,18 @@ class OpenDTOrchestrator:
             "power_usages": power_usages,
             "timestamps": deepcopy(timestamps),
         }
+
+    def datalake_overview(self, limit: int | None = None) -> list[dict[str, Any]]:
+        return self.datalake.list_runs(limit)
+
+    def datalake_entry(self, run_id: str) -> dict[str, Any] | None:
+        return self.datalake.load_run(run_id)
+
+
+def _stringify(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return aware.isoformat()
+    return str(value)

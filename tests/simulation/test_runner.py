@@ -192,13 +192,18 @@ def test_parse_results_aggregates_metrics(tmp_path, monkeypatch):
 
     result = runner.parse_opendc_results()
 
-    assert result == {
-        "energy_kwh": pytest.approx(1.5, rel=1e-3),
-        "cpu_utilization": pytest.approx(0.5, rel=1e-3),
-        "max_power_draw": pytest.approx(150.5, rel=1e-3),
-        "runtime_hours": pytest.approx(2.5, rel=1e-3),
-        "status": "success",
+    assert result["energy_kwh"] == pytest.approx(1.5, rel=1e-3)
+    assert result["cpu_utilization"] == pytest.approx(0.5, rel=1e-3)
+    assert result["max_power_draw"] == pytest.approx(150.5, rel=1e-3)
+    assert result["runtime_hours"] == pytest.approx(2.5, rel=1e-3)
+    assert result["status"] == "success"
+    assert set(result["timeseries"].keys()) == {
+        "power_draw",
+        "energy_usage",
+        "cpu_utilization",
+        "service_timestamps",
     }
+    assert "powerSource" in result["artifacts"]
 
 
 def test_parse_results_handles_missing_files(tmp_path, monkeypatch):
@@ -209,10 +214,14 @@ def test_parse_results_handles_missing_files(tmp_path, monkeypatch):
 
     result = runner.parse_opendc_results()
 
-    assert result == {
-        "energy_kwh": 0.0,
-        "cpu_utilization": 0.0,
-        "max_power_draw": 0.0,
-        "runtime_hours": 0.0,
-        "status": "success",
+    assert result["energy_kwh"] == 0.0
+    assert result["cpu_utilization"] == 0.0
+    assert result["max_power_draw"] == 0.0
+    assert result["runtime_hours"] == 0.0
+    assert result["status"] == "success"
+    assert result["timeseries"] == {
+        "power_draw": [],
+        "energy_usage": [],
+        "cpu_utilization": [],
+        "service_timestamps": [],
     }

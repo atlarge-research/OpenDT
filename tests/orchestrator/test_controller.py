@@ -81,3 +81,41 @@ def test_topo_hash_stable(orchestrator):
     topo_a = {"clusters": [{"name": "A", "hosts": [{"name": "h", "count": 1}]}]}
     topo_b = {"clusters": [{"hosts": [{"count": 1, "name": "h"}], "name": "A"}]}
     assert orchestrator._topo_hash(topo_a) == orchestrator._topo_hash(topo_b)
+
+
+def test_record_datalake_wraps_paths(orchestrator, tmp_path):
+    captured = {}
+
+    class StubLake:
+        def append_run(self, **kwargs):
+            captured.update(kwargs)
+
+    artifact = tmp_path / "power.parquet"
+    artifact.write_text("artifact")
+
+    orchestrator.datalake = StubLake()
+    orchestrator._record_datalake(
+        run_type="baseline",
+        result={
+            "energy_kwh": 1.0,
+            "cpu_utilization": 0.5,
+            "runtime_hours": 1.0,
+            "max_power_draw": 100.0,
+            "status": "success",
+            "raw_output_dir": "/tmp/out",
+        },
+        topology={"clusters": []},
+        metadata={"window_end": "t"},
+        timeseries={"power_draw": []},
+        artifacts={"power": str(artifact)},
+        window_id="t",
+        cycle=1,
+        attempt=0,
+        exp_name="exp",
+        score=88.0,
+        timestamp=None,
+    )
+
+    assert "artifacts" in captured
+    assert "power" in captured["artifacts"]
+    assert captured["artifacts"]["power"].name == artifact.name

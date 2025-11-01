@@ -123,3 +123,58 @@ def test_accept_recommendation_reports_failure(client, monkeypatch):
         assert response.get_json()["error"] == "Failed to update topology file"
     finally:
         orchestrator.state["best_config"] = previous
+
+
+def test_datalake_index_endpoint(client):
+    orchestrator = get_orchestrator()
+    previous = orchestrator.datalake
+
+    class FakeLake:
+        def list_runs(self, limit=None):  # noqa: D401 - simple stub
+            return [
+                {
+                    "run_id": "run-1",
+                    "timestamp": "2024-01-01T00:00:00Z",
+                    "run_type": "baseline",
+                    "energy_kwh": 1.5,
+                    "runtime_hours": 2.0,
+                }
+            ]
+
+        def load_run(self, run_id):
+            return {}
+
+    orchestrator.datalake = FakeLake()
+
+    try:
+        response = client.get("/api/datalake/index")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["runs"][0]["run_id"] == "run-1"
+    finally:
+        orchestrator.datalake = previous
+
+
+def test_datalake_run_endpoint(client):
+    orchestrator = get_orchestrator()
+    previous = orchestrator.datalake
+
+    class FakeLake:
+        def list_runs(self, limit=None):
+            return []
+
+        def load_run(self, run_id):
+            if run_id == "known":
+                return {"summary": {"run_id": run_id}, "metrics": {}}
+            return None
+
+    orchestrator.datalake = FakeLake()
+
+    try:
+        missing = client.get("/api/datalake/run/unknown")
+        assert missing.status_code == 404
+        found = client.get("/api/datalake/run/known")
+        assert found.status_code == 200
+        assert found.get_json()["summary"]["run_id"] == "known"
+    finally:
+        orchestrator.datalake = previous
