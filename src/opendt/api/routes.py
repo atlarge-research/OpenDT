@@ -127,7 +127,13 @@ def api_reset_topology():
 def api_sim_timeseries():
     orchestrator = get_orchestrator()
     res = orchestrator.simulation_timeseries()
-    logger.info("Sending opendc results of all time: %s", res)
+    timestamps = res.get('timestamps') or []
+    logger.info(
+        "Dispatching OpenDC timeseries payload: %s points (power=%s, cpu=%s)",
+        len(timestamps),
+        len(res.get('power_usages') or []),
+        len(res.get('cpu_usages') or []),
+    )
     res['timestamps'] = deepcopy(res['timestamps'])
     return jsonify(res)
 

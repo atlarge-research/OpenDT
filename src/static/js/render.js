@@ -75,6 +75,13 @@ function renderLLM(opt){
   const recommended = opt.new_topology || opt.best_config?.config || null;
   if (window.recommendationEditor && typeof window.recommendationEditor.ingest === 'function'){
     window.recommendationEditor.ingest(recommended);
+  } else {
+    const pill = $('#llmStatusMessage');
+    if (pill){
+      const hasData = Boolean(recommended);
+      pill.dataset.state = hasData ? 'ready' : 'idle';
+      pill.textContent = hasData ? 'Recommendation ready' : 'Awaiting recommendation';
+    }
   }
 
   const pre = $('#llmJSON');

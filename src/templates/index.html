@@ -155,14 +155,22 @@
             </div>
 
             <!-- LLM Recommendation -->
-            <div class="card glass lift">
+            <div class="card glass lift llm-card">
                 <div class="ui-only">
-                    <h3>🤖 LLM Suggested Topology</h3>
-                    <div class="kv">
+                    <div class="llm-card-title">
+                        <div class="llm-card-title-text">
+                            <h3>🤖 LLM Suggested Topology</h3>
+                            <p class="llm-card-subtitle">Live recommendations from optimization pipeline</p>
+                        </div>
+                        <span id="llmStatusMessage" class="llm-status-pill" data-state="idle">Awaiting recommendation</span>
+                    </div>
+
+                    <div class="kv llm-meta">
                         <div><span>Action</span><strong id="kvLLMAction">—</strong></div>
                         <div><span>Priority</span><span id="kvLLMPriority" class="badge">—</span></div>
                         <div><span>Type</span><span id="kvLLMType" class="badge">—</span></div>
                     </div>
+
                     <p class="llm-reason" id="kvLLMReason">—</p>
 
                     <div class="rec-actions">
@@ -184,7 +192,7 @@
                                 hidden
                                 title="Apply edits"
                                 aria-label="Apply edits">
-                            ✔
+                            Save changes
                         </button>
                         <button id="btnCancelRec"
                                 class="btn btn-danger"
@@ -192,7 +200,7 @@
                                 hidden
                                 title="Discard edits"
                                 aria-label="Discard edits">
-                            ✖
+                            Cancel
                         </button>
                     </div>
 
@@ -270,7 +278,7 @@
         <header class="datalake-header">
             <h2>📚 Data Lake Explorer</h2>
             <button id="btnCloseDatalake"
-                    class="btn btn-secondary btn-icon"
+                    class="btn btn-close-modal btn-icon"
                     type="button"
                     onclick="window.dataLake?.close()"
                     aria-label="Close data lake">
