@@ -62,6 +62,7 @@ kafka/kafka-data/
 reader/
 
 .venv
+.env
 
 
 ####backup files####
