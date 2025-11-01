@@ -53,6 +53,26 @@ def test_rule_based_tracks_best_configuration():
     assert optimizer.best_score < float("inf")
 
 
+def test_rule_based_returns_best_config_snapshot():
+    """Rule-based results should expose the cached best configuration snapshot."""
+
+    optimizer = LLM(openai_key=None)
+    topology = sample_topology()
+
+    result = optimizer.rule_based_optimization(
+        {"energy_kwh": 6.0, "runtime_hours": 1.1},
+        {"task_count": 3},
+        {"energy_target": 10.0, "runtime_target": 2.0},
+        current_topology=topology,
+    )
+
+    assert result["best_config"] is not None
+    assert result["best_config"] is not topology
+    assert result["best_config"]["clusters"][0]["hosts"][0]["cpu"]["coreCount"] == 16
+    assert result["best_score"] == optimizer.best_score
+    assert result["best_score"] == pytest.approx(optimizer.best_score)
+
+
 def test_convert_llm_to_topology_adds_hosts():
     """Ensure LLM recommendations are merged as new hosts into the topology."""
     optimizer = LLM(openai_key="dummy")
@@ -133,3 +153,124 @@ def test_llm_optimization_parses_ai_message_list(monkeypatch):
     assert result["type"] == "llm"
     assert result["recommendations"]["host_name"] == payload["host_name"]
     assert any(host["name"] == "H02" for c in result["new_topology"]["clusters"] for host in c["hosts"])
+
+
+def test_optimize_without_key_returns_rule_based():
+    """When no API key is configured the optimizer must fall back to the rule-based engine."""
+
+    optimizer = LLM(openai_key=None)
+    topology = sample_topology()
+
+    outcome = optimizer.optimize(
+        simulation_results={"energy_kwh": 12.0, "runtime_hours": 1.8},
+        batch_data={"task_count": 6},
+        slo_targets={"energy_target": 10.0, "runtime_target": 2.0},
+        current_topology=topology,
+    )
+
+    assert outcome["type"] == "rule_based"
+    assert "No OpenAI API key" in outcome["reason"]
+    assert optimizer.best_config is None
+
+
+def test_optimize_falls_back_when_llm_errors(monkeypatch):
+    """If the LLM call fails the optimizer should gracefully fall back to the rule-based plan."""
+
+    optimizer = LLM(openai_key="dummy")
+
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(optimizer, "llm_optimization", explode)
+
+    fallback = optimizer.optimize(
+        simulation_results={"energy_kwh": 8.0, "runtime_hours": 1.1},
+        batch_data={"task_count": 3},
+        slo_targets={"energy_target": 10.0, "runtime_target": 2.0},
+        current_topology=sample_topology(),
+    )
+
+    assert fallback["type"] == "rule_based"
+    assert fallback["reason"].startswith("LLM Error: boom")
+
+
+def test_convert_llm_to_topology_updates_existing_host():
+    """Existing topology entries should be updated rather than duplicated."""
+
+    optimizer = LLM(openai_key="dummy")
+    topology = sample_topology()
+
+    recommendations = {
+        "cluster_name": ["C01"],
+        "host_name": ["H01"],
+        "count": [4],
+        "coreCount": [28],
+        "coreSpeed": [2600],
+    }
+
+    updated = optimizer.convert_llm_to_topology(recommendations, topology)
+    host = updated["clusters"][0]["hosts"][0]
+
+    assert host["count"] == 4
+    assert host["cpu"]["coreCount"] == 28
+    assert host["cpu"]["coreSpeed"] == 2600
+
+
+def test_convert_llm_to_topology_uses_defaults_for_missing_fields():
+    """Missing optional recommendation fields should fall back to sensible defaults."""
+
+    optimizer = LLM(openai_key="dummy")
+    original = {"clusters": []}
+    rec = {
+        "cluster_name": ["C07"],
+        "host_name": ["H11"],
+        "coreCount": [20],
+        # intentionally omit count and coreSpeed to trigger defaults
+    }
+
+    updated = optimizer.convert_llm_to_topology(rec, original)
+
+    assert original == {"clusters": []}  # ensure we didn't mutate the input
+    host = updated["clusters"][0]["hosts"][0]
+    assert host["count"] == 1
+    assert host["cpu"]["coreCount"] == 20
+    assert host["cpu"]["coreSpeed"] == 2400
+
+
+def test_update_best_configuration_only_on_improvement():
+    """Only better performance scores should replace the stored best configuration."""
+
+    optimizer = LLM(openai_key="dummy")
+    initial = sample_topology()
+    worse = {"clusters": [{"name": "C99", "hosts": []}]}
+
+    optimizer.update_best_configuration({"energy_kwh": 12.0, "runtime_hours": 2.5}, worse)
+    best_before = optimizer.best_config
+
+    optimizer.update_best_configuration({"energy_kwh": 6.0, "runtime_hours": 1.0}, initial)
+
+    assert optimizer.best_config is not best_before
+    assert optimizer.best_config["clusters"][0]["name"] == "C01"
+    assert optimizer.best_config["clusters"][0]["hosts"][0]["cpu"]["coreCount"] == 16
+    assert optimizer.best_score == pytest.approx(13.0)
+
+
+def test_extract_text_content_handles_non_list_payloads():
+    """Extractor should gracefully process raw strings and mapping-based payloads."""
+
+    optimizer = LLM(openai_key="dummy")
+
+    assert optimizer._extract_text_content("  hello \n") == "hello"
+
+    message = type("Message", (), {"content": {"text": "ignored", "other": 1}})()
+    assert optimizer._extract_text_content(message) == "{'text': 'ignored', 'other': 1}"
+
+
+def test_extract_text_content_handles_empty_message():
+    """Empty or None messages should result in an empty string."""
+
+    optimizer = LLM(openai_key="dummy")
+
+    assert optimizer._extract_text_content(None) == ""
+    blank_message = type("Message", (), {"content": []})()
+    assert optimizer._extract_text_content(blank_message) == ""
