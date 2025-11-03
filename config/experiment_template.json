@@ -1,0 +1,15 @@
+{
+  "name": "simple",
+  "exportModels": [
+    {
+      "exportInterval": 300,
+      "printFrequency": 168,
+      "filesToExport": [
+        "powerSource"
+      ],
+      "computeExportConfig": {
+        "powerSourceExportColumns": ["energy_usage", "power_draw"]
+      }
+    }
+  ]
+}
