@@ -5,8 +5,8 @@
         {
           "count": 1,
           "cpu": {
-            "coreCount": 32,
-            "coreSpeed": 3200
+            "coreCount": 64,
+            "coreSpeed": 1600
           },
           "memory": {
             "memorySize": 214748364800
