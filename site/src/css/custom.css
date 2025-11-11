@@ -1,8 +1,8 @@
 :root {
     --ifm-code-font-size: 95%;
     --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
-    --ifm-color-primary: #2596be;
-    --ifm-hero-background-color: #2596be; /* optional, if you want a different hero color */
+    --ifm-color-primary: #49c183;
+    --ifm-hero-background-color: #49c183; /* optional, if you want a different hero color */
 
     counter-reset: figure-counter;
 }
