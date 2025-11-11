@@ -40,12 +40,12 @@ docker compose logs -f --tail=1 opendt
 
 To see _just_ the logs of the Python modules, run:
 ```sh
-docker compose logs --tail=1 -f --no-log-prefix opendt | jq 'select(.logger | startswith("werkzeug") | not)'
+docker compose logs --tail=1 -f --no-log-prefix opendt | jq -R 'fromjson? | select(. != null and (.logger | startswith("werkzeug") | not))'
 ```
 
 To see _just_ the logs of the Flask web app, run:
 ```sh
-docker compose logs --tail=1 -f --no-log-prefix opendt | jq 'select(.logger | startswith("werkzeug"))'
+docker compose logs --tail=1 -f --no-log-prefix opendt | jq -R 'fromjson? | select(. != null and (.logger | startswith("werkzeug")))'
 ```
 
 ## Repository
