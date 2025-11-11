@@ -27,9 +27,9 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    stop_grace_period: 3s
     ports:
       - "8080:8080"
     working_dir: /app
     volumes:
       - ./:/app
-
