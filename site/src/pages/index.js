@@ -31,8 +31,8 @@ export default function Home() {
     const { siteConfig } = useDocusaurusContext()
     return (
         <Layout
-            title={`${siteConfig.title} cloud datacenter simulator`}
-            description="Collaborative Datacenter Simulation and Exploration for Everybody"
+            title={`${siteConfig.title} cloud datacenter digital twin`}
+            description="Digital Twin for Datacenters"
         >
             <HomepageHeader />
             <main>
