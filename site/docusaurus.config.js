@@ -1,15 +1,15 @@
 // @ts-check
 
 const organizationName = "atlarge-research";
-const projectName = "opendc";
+const projectName = "opendt";
 
 const lightCodeTheme = require("prism-react-renderer/themes/github");
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 
 /** @type {import("@docusaurus/types").Config} */
 const config = {
-    title: "OpenDC",
-    tagline: "Collaborative Datacenter Simulation and Exploration for Everybody",
+    title: "OpenDT",
+    tagline: "Digital Twin for Datacenters",
     url: process.env.DOCUSAURUS_URL || `https://${organizationName}.github.io`,
     baseUrl: process.env.DOCUSAURUS_BASE_PATH || `/${projectName}/`,
     onBrokenLinks: "throw",
@@ -57,9 +57,9 @@ const config = {
     /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
         ({
             navbar: {
-                title: "OpenDC",
+                title: "OpenDT",
                 logo: {
-                    alt: "OpenDC logo",
+                    alt: "OpenDT logo",
                     src: "/img/logo.svg"
                 },
                 items: [
@@ -69,19 +69,19 @@ const config = {
                         position: "left",
                         label: "Learn"
                     },
-                    {
-                        to: "/community/support",
-                        label: "Community",
-                        position: "left",
-                        activeBaseRegex: `/community/`
-                    },
-                    {
-                        href: "https://app.opendc.org",
-                        html: "Log In",
-                        position: "right",
-                        className: "header-app-link button button--outline button--primary",
-                        "aria-label": "OpenDC web application",
-                    },
+                    // {
+                    //     to: "/community/support",
+                    //     label: "Community",
+                    //     position: "left",
+                    //     activeBaseRegex: `/community/`
+                    // },
+                    // {
+                    //     href: "https://app.opendc.org",
+                    //     html: "Log In",
+                    //     position: "right",
+                    //     className: "header-app-link button button--outline button--primary",
+                    //     "aria-label": "OpenDC web application",
+                    // },
                     {
                         href: `https://github.com/${organizationName}/${projectName}`,
                         position: "right",
@@ -106,23 +106,23 @@ const config = {
                             }
                         ]
                     },
-                    {
-                        title: "Community",
-                        items: [
-                            {
-                                label: "Support",
-                                to: "/community/support"
-                            },
-                            {
-                                label: "Team",
-                                to: "/community/team"
-                            },
-                            {
-                                label: "GitHub Discussions",
-                                href: `https://github.com/${organizationName}/${projectName}/discussions`
-                            }
-                        ]
-                    },
+                    // {
+                    //     title: "Community",
+                    //     items: [
+                    //         {
+                    //             label: "Support",
+                    //             to: "/community/support"
+                    //         },
+                    //         {
+                    //             label: "Team",
+                    //             to: "/community/team"
+                    //         },
+                    //         {
+                    //             label: "GitHub Discussions",
+                    //             href: `https://github.com/${organizationName}/${projectName}/discussions`
+                    //         }
+                    //     ]
+                    // },
                     {
                         title: "More",
                         items: [
