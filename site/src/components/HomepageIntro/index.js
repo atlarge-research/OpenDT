@@ -43,11 +43,11 @@ export default function HomepageInto() {
                         <img src={DatacenterImage} alt="Schematic top-down view of a datacenter" />
                     </div>
                     <div className={clsx('col col--4', styles.textCol)}>
-                        <h3>OpenDC provides...</h3>
+                        <h3>OpenDT provides...</h3>
                         <ul>
-                            <li>Online cloud DC modeling</li>
-                            <li>Diverse and effective DC simulation</li>
-                            <li>Rapid exploratory DC feedback</li>
+                            <li>Datacenter digital twin monitoring as a service</li>
+                            <li>Human-in-the-loop feedback</li>
+                            <li>LLM-powered optimization</li>
                         </ul>
                     </div>
                 </div>

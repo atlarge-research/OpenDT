@@ -19,7 +19,7 @@ function HomepageHeader() {
                 <Logo role="img" width="100" height="100" alt="OpenDC logo" className={styles.logo} />
                 <div className={styles.buttons}>
                     <Link className="button button--secondary button--lg" to="/docs/intro">
-                        Getting Started with OpenDC - 10min ⏱️
+                        Getting Started with OpenDT - 10min ⏱️
                     </Link>
                 </div>
             </div>

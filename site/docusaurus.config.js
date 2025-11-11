@@ -69,12 +69,12 @@ const config = {
                         position: "left",
                         label: "Learn"
                     },
-                    // {
-                    //     to: "/community/support",
-                    //     label: "Community",
-                    //     position: "left",
-                    //     activeBaseRegex: `/community/`
-                    // },
+                    {
+                        to: "/community/support",
+                        label: "Community",
+                        position: "left",
+                        activeBaseRegex: `/community/`
+                    },
                     // {
                     //     href: "https://app.opendc.org",
                     //     html: "Log In",
@@ -106,23 +106,23 @@ const config = {
                             }
                         ]
                     },
-                    // {
-                    //     title: "Community",
-                    //     items: [
-                    //         {
-                    //             label: "Support",
-                    //             to: "/community/support"
-                    //         },
-                    //         {
-                    //             label: "Team",
-                    //             to: "/community/team"
-                    //         },
-                    //         {
-                    //             label: "GitHub Discussions",
-                    //             href: `https://github.com/${organizationName}/${projectName}/discussions`
-                    //         }
-                    //     ]
-                    // },
+                    {
+                        title: "Community",
+                        items: [
+                            {
+                                label: "Support",
+                                to: "/community/support"
+                            },
+                            {
+                                label: "Team",
+                                to: "/community/team"
+                            },
+                            // {
+                            //     label: "GitHub Discussions",
+                            //     href: `https://github.com/${organizationName}/${projectName}/discussions`
+                            // }
+                        ]
+                    },
                     {
                         title: "More",
                         items: [
