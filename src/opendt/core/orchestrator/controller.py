@@ -9,6 +9,8 @@ import time
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 from ...config import loaders
 from ...config.settings import (
@@ -61,6 +63,14 @@ class OpenDTOrchestrator:
         self.load_initial_slo()
         self.start_topology_watcher()
         self.start_slo_watcher()
+
+        # Load environment
+        INFLUX_URL = os.getenv("INFLUX_URL", "http://influxdb:8086")
+        INFLUX_TOKEN = os.getenv("INFLUX_TOKEN", "MyInitialAdminToken0==")
+        INFLUX_ORG = os.getenv("INFLUX_ORG", "opendt")
+        self.influx_bucket = os.getenv("INFLUX_BUCKET", "opendt")
+
+        self.client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 
     def load_initial_topology(self) -> None:
         topo = loaders.read_topology(self.topology_path)
@@ -288,8 +298,21 @@ class OpenDTOrchestrator:
                 logger.info("🔄 Processing cycle %s", cycle)
 
                 baseline = self.run_simulation(batch_data)
-
                 timestamp = batch_data["window_end"].strftime("%Y-%m-%dT%H:%M:%SZ")
+
+                point = (
+                    Point("simulations")
+                    .field("energy_kwh", float(baseline["energy_kwh"]))
+                    .field("cpu_utilization", float(baseline["cpu_utilization"]))
+                    .field("max_power_draw", float(baseline["max_power_draw"]))
+                    .field("runtime_hours", float(baseline["runtime_hours"]))
+                    .field("status", baseline["status"])
+                    .time(timestamp, WritePrecision.NS)
+                )
+
+                with self.client.write_api(write_options=SYNCHRONOUS) as write_api:
+                    write_api.write(bucket=self.influx_bucket, record=point)
+
                 self._append_simulation_result(baseline, timestamp)
 
                 self.state["last_simulation"] = baseline
