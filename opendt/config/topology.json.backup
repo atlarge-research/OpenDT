@@ -1,0 +1,31 @@
+{
+  "clusters": [
+    {
+      "name": "C01",
+      "hosts": [
+        {
+          "name": "H01",
+          "count": 2,
+          "cpu": {
+            "coreCount": 64,
+            "coreSpeed": 2800
+          },
+          "memory": {
+            "memorySize": 34359738368
+          }
+        },
+        {
+          "name": "H02",
+          "count": 3,
+          "cpu": {
+            "coreCount": 32,
+            "coreSpeed": 1800
+          },
+          "memory": {
+            "memorySize": 34359738368
+          }
+        }
+      ]
+    }
+  ]
+}

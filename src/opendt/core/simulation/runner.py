@@ -23,10 +23,14 @@ class OpenDCRunner:
     def __init__(self) -> None:
         package_root = SIMULATOR_ROOT
         possible_paths = [
-            package_root / "bin" / "OpenDCExperimentRunner" / "bin" / "OpenDCExperimentRunner",
-            package_root / "bin" / "OpenDCExperimentRunner" / "OpenDCExperimentRunner",
+            
+            Path("/app/opendt/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"),
+            Path("/app/opendt/opendt-simulator/bin/OpenDCExperimentRunner/OpenDCExperimentRunner"),
             Path("/app/opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"),
             Path("/app/opendt-simulator/bin/OpenDCExperimentRunner/OpenDCExperimentRunner"),
+
+            package_root / "bin" / "OpenDCExperimentRunner" / "bin" / "OpenDCExperimentRunner",
+            package_root / "bin" / "OpenDCExperimentRunner" / "OpenDCExperimentRunner",
             Path("/app/opendc/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"),
             Path("/app/opendc/bin/OpenDCExperimentRunner/OpenDCExperimentRunner"),
             Path("./opendt-simulator/bin/OpenDCExperimentRunner/bin/OpenDCExperimentRunner"),

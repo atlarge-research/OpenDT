@@ -1,13 +1,9 @@
 """OpenDT package initialization."""
 from __future__ import annotations
 
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-# Load environment variables early so downstream modules can rely on them.
-load_dotenv()  # fall back to default discovery (useful for tooling)
-load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
+# Keep package import lightweight. Application entrypoints should call
+# `load_dotenv()` as part of startup to ensure environment variables are
+# populated for runtime-only concerns.
 
 from .app import create_app
 

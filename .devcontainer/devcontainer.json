@@ -10,8 +10,7 @@
   "overrideCommand": true,
 
   "containerEnv": {
-    "OPENAI_API_KEY": "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"
-  },
+    "OPENAI_API_KEY": "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"  },
 
   "forwardPorts": [8080, 29092],
 

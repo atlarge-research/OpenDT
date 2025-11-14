@@ -41,4 +41,4 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "-m", "opendt.cli"]
+# CMD ["python", "-m", "opendt.cli"]
