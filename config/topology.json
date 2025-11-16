@@ -5,7 +5,7 @@
         {
           "count": 1,
           "cpu": {
-            "coreCount": 32,
+            "coreCount": 36,
             "coreSpeed": 3200
           },
           "memory": {

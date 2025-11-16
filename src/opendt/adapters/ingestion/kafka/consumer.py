@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from collections import deque
@@ -10,6 +11,8 @@ from typing import Deque, Dict
 
 import pandas as pd
 from kafka import KafkaConsumer
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 
 from ....config.settings import REAL_WINDOW_SIZE_SEC, VIRTUAL_WINDOW_SIZE
 
@@ -35,6 +38,8 @@ class DigitalTwinConsumer:
 
         self.windows_lock = threading.Condition()
         self.windows: Deque = deque(maxlen=50)
+
+        self.engine = self.db_connections()
 
     def process_windows(self):
         logger.info("📥 Starting Kafka consumers...")
@@ -180,8 +185,76 @@ class DigitalTwinConsumer:
             'fragments_sample': frags_df.to_dict(orient='records'),
         }
 
+        curr_tasks_df['batch_number'] = window_number
+        frags_df['batch_number'] = window_number
+        self.store(curr_tasks_df, table="tasks_consumed")
+        self.store(frags_df, table="fragments_consumed")
+
         logger.info("📊 Window %s: %s tasks, %s fragments", window_number, task_count, fragment_count)
         return batch_data
+
+    def db_connections(self):
+        max_retries = 5
+        delay = 2
+        
+        db_url = os.environ.get("DATABASE_URL")
+        if not db_url:
+            logger.warning("DATABASE_URL not set, using default for local development")
+            db_url = "postgresql://myuser:mypassword@localhost:5500/mydb"
+        
+        # When running locally (not in docker), replace db:5432 with localhost:5500
+        if "db:5432" in db_url and not os.path.exists("/.dockerenv"):
+            logger.info("Detected local environment, remapping db:5432 -> localhost:5500")
+            db_url = db_url.replace("db:5432", "localhost:5500")
+        
+        logger.info("Connecting to database: %s", db_url.split('@')[-1] if '@' in db_url else db_url)
+        
+        # Allow skipping database in development mode
+        if os.environ.get("OPENDT_SKIP_DB", "0") == "1":
+            logger.warning("⚠️  OPENDT_SKIP_DB=1 - Database storage disabled (dev mode)")
+            return None
+        
+        engine = create_engine(db_url, pool_pre_ping=True, pool_size=5, max_overflow=10)
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                logger.info("✅ Connected to database")
+                break
+            except OperationalError as e:
+                logger.warning("⚠️  Database not ready (attempt %d/%d): %s", attempt, max_retries, e)
+                if attempt == max_retries:
+                    logger.error("❌ Could not connect to database after %d attempts", max_retries)
+                    logger.error("💡 Set OPENDT_SKIP_DB=1 to run without database (dev mode)")
+                    raise
+                time.sleep(delay)
+
+        return engine
+    
+    def store(self, df, table, if_exists='append', chunksize=5000):
+        if df.empty:
+            logger.warning("Skipping store for empty DataFrame (table: %s)", table)
+            return
+        
+        if self.engine is None:
+            logger.warning("Database disabled - skipping store to table '%s'", table)
+            return
+        
+        try:
+            df.to_sql(
+                name=table,
+                con=self.engine,
+                if_exists=if_exists,
+                index=False,
+                method='multi',
+                chunksize=chunksize
+            )
+            logger.info("✅ Stored %d rows to table '%s'", len(df), table)
+        except Exception as exc:
+            logger.error("❌ Failed to store data to table '%s': %s", table, exc)
+            raise
+
 
     def stop(self) -> None:
         self.stop_consuming.set()

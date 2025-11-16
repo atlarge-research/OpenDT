@@ -24,12 +24,61 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      db:
+        condition: service_healthy
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DATABASE_URL: postgresql://myuser:mypassword@db:5432/mydb
     ports:
       - "8080:8080"
     working_dir: /app
     volumes:
       - ./:/app
 
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    ports:
+      - "5500:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin_local
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8010:80"
+
+  loader:
+    build: .
+    #   context: ./app
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: []  # Override ENTRYPOINT to skip entrypoint.sh
+    environment:
+      DATABASE_URL: postgresql://myuser:mypassword@db:5432/mydb
+    # volumes:
+    #   - ./data:/data
+    #   - ./app:/app
+    
+    command: python -u /app/load_parquet.py --files /app/surf-workload/tasks.parquet  --if-exists replace
+
+volumes:
+  pgdata:

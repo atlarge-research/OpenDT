@@ -9,3 +9,7 @@ watchdog
 pytest
 numpy
 python-dotenv==1.0.1
+psycopg2-binary
+sqlalchemy
+pandas
+

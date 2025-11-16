@@ -12,14 +12,17 @@
   "containerEnv": {
     "OPENAI_API_KEY": "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"  },
 
-  "forwardPorts": [8080, 29092],
+  "forwardPorts": [8080, 29092,8010,5500],
 
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
         "ms-azuretools.vscode-docker",
-        "EditorConfig.EditorConfig"
+        "EditorConfig.EditorConfig",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-cell-tags"
       ]
     }
   }
