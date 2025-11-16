@@ -7,16 +7,16 @@ OpenDT runs two concurrent threads that communicate via Kafka:
 The producer streams workload traces to Kafka, simulating real-time datacenter activity.
 
 ### Data Sources
-- **tasks.parquet** (7,850 tasks)
+- **tasks.parquet**
   - Columns: `id`, `submission_time`, `duration`, `cpu_count`, `cpu_capacity`, `mem_capacity`
   - Tasks have timestamps indicating when they were submitted
   
-- **fragments.parquet** (2.3M fragments)
+- **fragments.parquet**
   - Columns: `id` (task_id), `duration`, `cpu_count`, `cpu_usage`
   - Fragments have NO submission times in raw data
   - Each task is composed of ≥1 fragments for fine-grained resource modeling
 
-The SURF workload trace captures approximately **7 days of wall clock time**.
+More info about these fields can be found in the [OpenDC documentation](https://atlarge-research.github.io/opendc/docs/documentation/Input/Workload/#tasks).
 
 ### Key Transformations
 
@@ -34,7 +34,7 @@ Fragment 3.submission_time = T=0 + duration[0] + duration[1] + duration[2]
 This creates a sequential execution timeline where fragments "chain" together.
 
 **Time-Scaled Replay:**
-- Original trace: ~7 days of workload data
+- Original trace: ~7 days of SURF workload data
 - Replay speed: 10x accelerated (TIME_SCALE = 0.1)
 - Real-time gaps between events are preserved but compressed
 - Example: 1-hour workload gap → 6-minute real wait
@@ -101,4 +101,45 @@ This is a simplification of reality but makes reasoning about the simulation beh
 
 ## 2. Consumer Loop (Digital Twin)
 
-_[To be documented]_
+The consumer organizes incoming Kafka messages into time-based windows and feeds them to the OpenDC simulator.
+
+### Windowing Strategy
+
+**Window Size:** 5 minutes of virtual trace time (`REAL_WINDOW_SIZE_SEC = 300s`)
+
+**Processing:** Windows are created based on `submission_time` timestamps:
+- As tasks/fragments arrive, they're assigned to windows based on their timestamp
+- A window becomes "ready" when data from the next time window starts arriving
+- Windows are processed sequentially (FIFO)
+
+**Example:**
+```
+Window 5: 2022-10-06 22:22:00 → 22:27:00
+  ├─ 113 tasks
+  └─ 1,243 fragments (~11 per task)
+```
+
+### Output to Orchestrator
+
+Each completed window yields a `batch_data` dictionary containing:
+- `tasks_sample`: List of task objects for this window
+- `fragments_sample`: List of fragment objects for this window  
+- `task_count`, `fragment_count`: Counts
+- `avg_cpu_usage`: Average CPU usage across fragments
+- `window_start`, `window_end`: Time boundaries
+
+### Simulation Flow
+
+1. Orchestrator receives `batch_data`
+2. OpenDC simulates workload on current topology
+3. Returns: `energy_kwh`, `runtime_hours`, `cpu_utilization`, `max_power_draw`
+
+**Real example from logs:**
+- Input: 113 tasks, 1,243 fragments
+- Output: `energy_kwh=0.84`, `runtime_hours=2.62`, `cpu_utilization=57.3%`
+
+### Implementation
+- Three threads: tasks consumer, fragments consumer, window processor
+- Threads share window state via locks/conditions
+- Task-fragment matching: Fragments are joined with their parent tasks by `id`
+- Windows wait `VIRTUAL_WINDOW_SIZE = 30s` between processing (real time)
