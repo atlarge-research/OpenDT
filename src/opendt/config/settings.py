@@ -15,6 +15,10 @@ TIME_SCALE: float = 1 / 10
 REAL_WINDOW_SIZE_SEC: int = 5 * 60
 VIRTUAL_WINDOW_SIZE: float = REAL_WINDOW_SIZE_SEC * TIME_SCALE
 
+# Fast mode speedup factor: how much faster than TIME_SCALE to run experiments
+# E.g., 30x means: virtual_time * TIME_SCALE / 30 = real_time
+FAST_MODE_SPEEDUP_FACTOR: int = 30
+
 
 @dataclass(frozen=True)
 class SLOTargets:
@@ -61,6 +65,7 @@ def openai_api_key() -> str | None:
 class ExperimentConfig:
     experiment_mode: bool = False
     enable_optimization: bool = True
+    fast_mode: bool = False
     experiment_name: str = "default"
     output_path: str = "output/experiments"
 
@@ -68,6 +73,7 @@ class ExperimentConfig:
         return {
             "experiment_mode": self.experiment_mode,
             "enable_optimization": self.enable_optimization,
+            "fast_mode": self.fast_mode,
             "experiment_name": self.experiment_name,
             "output_path": self.output_path,
         }
@@ -81,6 +87,7 @@ class ExperimentConfig:
         return cls(
             experiment_mode=bool(data.get("experiment_mode", defaults.experiment_mode)),
             enable_optimization=bool(data.get("enable_optimization", defaults.enable_optimization)),
+            fast_mode=bool(data.get("fast_mode", defaults.fast_mode)),
             experiment_name=str(data.get("experiment_name", defaults.experiment_name)),
             output_path=str(data.get("output_path", defaults.output_path)),
         )

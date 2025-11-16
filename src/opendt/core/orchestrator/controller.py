@@ -197,11 +197,15 @@ class OpenDTOrchestrator:
         self.stop_event.clear()
 
         try:
-            self.producer = TimedKafkaProducer(self.kafka_servers)
+            self.producer = TimedKafkaProducer(
+                self.kafka_servers,
+                fast_mode=self.experiment_config.fast_mode
+            )
             self.consumer = DigitalTwinConsumer(
                 self.kafka_servers,
                 "OpenDT_telemetry",
-                experiment_mode=self.experiment_config.experiment_mode
+                experiment_mode=self.experiment_config.experiment_mode,
+                fast_mode=self.experiment_config.fast_mode
             )
 
             self.consumer_thread = threading.Thread(target=self.run_consumer, daemon=False)

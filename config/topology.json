@@ -3,18 +3,18 @@
     {
       "hosts": [
         {
-          "count": 1,
+          "count": 277,
           "cpu": {
-            "coreCount": 64,
-            "coreSpeed": 1600
+            "coreCount": 16,
+            "coreSpeed": 2100
           },
           "memory": {
-            "memorySize": 214748364800
+            "memorySize": 128000000
           },
-          "name": "H01"
+          "name": "A01"
         }
       ],
-      "name": "C01"
+      "name": "A01"
     }
   ]
 }

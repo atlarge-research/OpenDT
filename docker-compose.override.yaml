@@ -4,6 +4,7 @@ services:
     environment:
       - OPENDT_DATA_DIR=/app/data
       - OPENDT_SIM_DIR=/app/output/opendt-simulation/raw-output
+      - OPENDT_LOG_LEVEL=DEBUG
     volumes:
       - ./:/app
       - ./output/opendt-simulation/raw-output:/app/output/opendt-simulation/raw-output

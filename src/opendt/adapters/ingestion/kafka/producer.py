@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from datetime import datetime
 from time import sleep
 from typing import Optional
@@ -11,7 +12,7 @@ from typing import Optional
 import pandas as pd
 from kafka import KafkaProducer
 
-from ....config.settings import TIME_SCALE
+from ....config.settings import FAST_MODE_SPEEDUP_FACTOR, TIME_SCALE
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,9 @@ logger = logging.getLogger(__name__)
 class TimedKafkaProducer:
     """Streams parquet data to Kafka with paced windows."""
 
-    def __init__(self, bootstrap_servers: str) -> None:
+    def __init__(self, bootstrap_servers: str, fast_mode: bool = False) -> None:
         self.bootstrap_servers = bootstrap_servers
+        self.fast_mode = fast_mode
         self.producer: Optional[KafkaProducer] = None
         self.stop_streaming = threading.Event()
         self.start_time: Optional[datetime] = None
@@ -34,11 +36,16 @@ class TimedKafkaProducer:
         )
         logger.info("📡 Connected to Kafka: %s", self.bootstrap_servers)
 
-    def tasks_streaming_thread(self, tasks: pd.DataFrame, start_time: pd.Timestamp) -> None:
+    def tasks_streaming_thread(self, tasks: pd.DataFrame, workload_start_time: pd.Timestamp) -> None:
         self.start_streaming_barrier.wait()
-        logger.info("Started streaming tasks")
+        
+        # Record the actual wall-clock time when we start streaming
+        streaming_start_time = time.time()
+        speedup_factor = FAST_MODE_SPEEDUP_FACTOR if self.fast_mode else 1
+        total_tasks = len(tasks)
+        
+        logger.info("📤 Started streaming %d tasks (speedup: %dx)", total_tasks, speedup_factor)
 
-        last_submission_time = start_time
         for index, row in tasks.iterrows():
             if self.stop_streaming.is_set():
                 return
@@ -52,24 +59,45 @@ class TimedKafkaProducer:
                 'mem_capacity': int(row['mem_capacity']),
             }
 
+            # Calculate when this message SHOULD be sent (absolute time since workload start)
             submission_time = row["submission_time"]
-            if submission_time > last_submission_time:
-                sleep_time = (submission_time - last_submission_time).total_seconds()
-                sleep_time_virt = sleep_time * TIME_SCALE
-                sleep(sleep_time_virt)
+            time_since_workload_start = (submission_time - workload_start_time).total_seconds()
+            
+            # Apply speed scaling
+            scaled_time = time_since_workload_start * TIME_SCALE / speedup_factor
+            
+            # Calculate target wall-clock time
+            target_time = streaming_start_time + scaled_time
+            
+            # Sleep until target time (if we're ahead)
+            current_time = time.time()
+            sleep_duration = target_time - current_time
+            if sleep_duration > 0:
+                sleep(sleep_duration)
 
             self.producer.send("tasks", key=key, value=value)
 
             if index % 20 == 0:
                 self.producer.flush()
+            
+            # Log progress every 100 tasks
+            if index > 0 and index % 100 == 0:
+                elapsed_real = time.time() - streaming_start_time
+                expected_elapsed = scaled_time
+                drift = elapsed_real - expected_elapsed
+                progress_pct = (index / total_tasks) * 100
+                logger.info("📤 Tasks: %d/%d (%.1f%%) | Elapsed: %.1fs | Expected: %.1fs | Drift: %+.2fs", 
+                           index, total_tasks, progress_pct, elapsed_real, expected_elapsed, drift)
 
-            last_submission_time = submission_time
-
-    def fragments_streaming_thread(self, frags: pd.DataFrame, start_time: pd.Timestamp) -> None:
+    def fragments_streaming_thread(self, frags: pd.DataFrame, workload_start_time: pd.Timestamp) -> None:
         self.start_streaming_barrier.wait()
-        logger.info("Started streaming fragments")
-
-        last_submission_time = start_time
+        
+        # Record the actual wall-clock time when we start streaming
+        streaming_start_time = time.time()
+        speedup_factor = FAST_MODE_SPEEDUP_FACTOR if self.fast_mode else 1
+        total_fragments = len(frags)
+        
+        logger.info("📤 Started streaming %d fragments (speedup: %dx)", total_fragments, speedup_factor)
 
         for index, row in frags.iterrows():
             if self.stop_streaming.is_set():
@@ -82,18 +110,35 @@ class TimedKafkaProducer:
                 'submission_time': row['submission_time'].isoformat(),
             }
 
+            # Calculate when this message SHOULD be sent (absolute time since workload start)
             submission_time = row["submission_time"]
-            if submission_time > last_submission_time:
-                sleep_time = (submission_time - last_submission_time).total_seconds()
-                sleep_time_virt = sleep_time * TIME_SCALE
-                sleep(sleep_time_virt)
+            time_since_workload_start = (submission_time - workload_start_time).total_seconds()
+            
+            # Apply speed scaling
+            scaled_time = time_since_workload_start * TIME_SCALE / speedup_factor
+            
+            # Calculate target wall-clock time
+            target_time = streaming_start_time + scaled_time
+            
+            # Sleep until target time (if we're ahead)
+            current_time = time.time()
+            sleep_duration = target_time - current_time
+            if sleep_duration > 0:
+                sleep(sleep_duration)
 
             self.producer.send("fragments", key=key, value=value)
 
             if index % 100 == 0:
                 self.producer.flush()
-
-            last_submission_time = submission_time
+            
+            # Log progress every 5000 fragments (to avoid spam with 2.3M fragments)
+            if index > 0 and index % 10_000 == 0:
+                elapsed_real = time.time() - streaming_start_time
+                expected_elapsed = scaled_time
+                drift = elapsed_real - expected_elapsed
+                progress_pct = (index / total_fragments) * 100
+                logger.info("📤 Fragments: %d/%d (%.1f%%) | Elapsed: %.1fs | Expected: %.1fs | Drift: %+.2fs", 
+                           index, total_fragments, progress_pct, elapsed_real, expected_elapsed, drift)
 
     def stream_parquet_data_timed(self, tasks_file: str, fragments_file: str):
         if not self.producer:
@@ -120,8 +165,9 @@ class TimedKafkaProducer:
 
         logger.info("📊 Loaded %s tasks, %s fragments", len(tasks_df), len(fragments_df))
 
-        tasks_df = tasks_df.sort_values('submission_time')
-        fragments_df = fragments_df.sort_values('submission_time')
+        # Sort by submission time and reset index so indices are 0, 1, 2, ...
+        tasks_df = tasks_df.sort_values('submission_time').reset_index(drop=True)
+        fragments_df = fragments_df.sort_values('submission_time').reset_index(drop=True)
 
         start_time = tasks_df['submission_time'].min()
         end_time = fragments_df['submission_time'].max()
@@ -140,7 +186,7 @@ class TimedKafkaProducer:
         tasks_thread.join()
         frags_thread.join()
 
-        logger.info("✅ All data streamed")
+        logger.info("✅ All data streamed successfully")
         return {
             'total_tasks': len(tasks_df),
             'total_fragments': len(fragments_df),
