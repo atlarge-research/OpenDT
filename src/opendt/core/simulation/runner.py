@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -120,6 +121,7 @@ class OpenDCRunner:
         fragments_data: Iterable[Mapping[str, Any]] | None,
         topology_data: Mapping[str, Any] | None,
         expName: str = "simple",
+        window_archive_dir: str | None = None,
     ) -> dict[str, Any]:
         if not self.opendc_path:
             raise FileNotFoundError(
@@ -144,6 +146,10 @@ class OpenDCRunner:
         experiment_file = Path("/tmp/experiment.json")
         experiment_file.write_text(json.dumps(experiment, indent=2))
         logger.info("📄 Created experiment: %s", experiment_file)
+        
+        # Archive input files if requested
+        if window_archive_dir:
+            self._archive_inputs(window_archive_dir, workload_path, topology_file, experiment_file)
 
         logger.info("🚀 Running OpenDC simulation: %s", self.opendc_path)
         env = os.environ.copy()
@@ -201,7 +207,77 @@ class OpenDCRunner:
             )
 
         logger.info("✅ OpenDC simulation completed successfully")
-        return self.parse_opendc_results()
+        results = self.parse_opendc_results()
+        
+        # Archive output files if requested
+        if window_archive_dir:
+            self._archive_outputs(window_archive_dir)
+        
+        return results
+
+    def _archive_inputs(self, archive_dir: str, workload_path: str, topology_file: Path, experiment_file: Path) -> None:
+        """Archive input files to the experiment directory."""
+        try:
+            inputs_dir = Path(archive_dir) / "inputs"
+            inputs_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Copy workload files (tasks.parquet and fragments.parquet)
+            workload_dir = Path(workload_path)
+            for parquet_file in ["tasks.parquet", "fragments.parquet"]:
+                src = workload_dir / parquet_file
+                if src.exists():
+                    shutil.copy2(src, inputs_dir / parquet_file)
+                    logger.debug(f"📁 Archived input: {parquet_file}")
+            
+            # Copy configuration files
+            if topology_file.exists():
+                shutil.copy2(topology_file, inputs_dir / "topology.json")
+                logger.debug(f"📁 Archived input: topology.json")
+            
+            if experiment_file.exists():
+                shutil.copy2(experiment_file, inputs_dir / "experiment.json")
+                logger.debug(f"📁 Archived input: experiment.json")
+            
+            logger.info(f"📁 Archived simulation inputs to: {inputs_dir}")
+        except Exception as exc:
+            logger.error(f"Failed to archive input files: {exc}")
+    
+    def _archive_outputs(self, archive_dir: str) -> None:
+        """Archive output files to the experiment directory."""
+        try:
+            outputs_dir = Path(archive_dir) / "outputs"
+            outputs_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Find and copy output files
+            output_dirs = [
+                Path("output/opendt-simulation/raw-output/0/seed=0"),
+                Path("./output/simple/raw-output/0/seed=0"),
+                Path("/tmp/output"),
+                Path(os.environ.get("OPENDT_SIM_DIR") or "/app/output/opendt-simulation/raw-output"),
+            ]
+            
+            copied_files = []
+            for odir in output_dirs:
+                if not odir.exists():
+                    continue
+                
+                for output_file in ["powerSource.parquet", "host.parquet", "service.parquet", "task.parquet"]:
+                    src = odir / output_file
+                    if src.exists():
+                        shutil.copy2(src, outputs_dir / output_file)
+                        copied_files.append(output_file)
+                        logger.debug(f"📁 Archived output: {output_file}")
+                
+                # If we found files, stop searching
+                if copied_files:
+                    break
+            
+            if copied_files:
+                logger.info(f"📁 Archived {len(copied_files)} simulation outputs to: {outputs_dir}")
+            else:
+                logger.warning(f"⚠️ No output files found to archive")
+        except Exception as exc:
+            logger.error(f"Failed to archive output files: {exc}")
 
     def parse_opendc_results(self) -> dict[str, Any]:
         try:
@@ -216,7 +292,8 @@ class OpenDCRunner:
             for odir in output_dirs:
                 if not odir.exists():
                     continue
-                pfile = odir / "powerSource.parquet"
+                # pfile = odir / "powerSource.parquet"
+                pfile = odir / "host.parquet"
                 hfile = odir / "host.parquet"
                 sfile = odir / "service.parquet"
                 if pfile.exists():
@@ -231,8 +308,11 @@ class OpenDCRunner:
             if power_df is not None and len(power_df) > 0:
                 energy_kwh = power_df["energy_usage"].sum() / 3_600_000
                 max_power = float(power_df["power_draw"].max())
+                mean_power = float(power_df["power_draw"].mean())
+                mean_power_kw = round(mean_power / 1000, 3)
             else:
                 energy_kwh, max_power = 0.0, 0.0
+                mean_power_kw = 0.0
 
             if host_df is not None and len(host_df) > 0 and "cpu_utilization" in host_df.columns:
                 cpu_util = float(host_df["cpu_utilization"].mean())
@@ -249,6 +329,7 @@ class OpenDCRunner:
                 "energy_kwh": round(float(energy_kwh), 4),
                 "cpu_utilization": round(float(cpu_util), 3),
                 "max_power_draw": round(float(max_power), 1),
+                "mean_power_draw_kw": mean_power_kw,
                 "runtime_hours": round(float(runtime_hours), 2),
                 "status": "success",
             }
@@ -258,7 +339,7 @@ class OpenDCRunner:
                 "energy_kwh": 0.0,
                 "cpu_utilization": 0.0,
                 "max_power_draw": 0.0,
+                "mean_power_draw_kw": 0.0,
                 "runtime_hours": 0.0,
                 "status": "error",
             }
-

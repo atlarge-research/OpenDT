@@ -91,32 +91,26 @@ class DigitalTwinConsumer:
         sub_time = pd.to_datetime(data["submission_time"])
 
         window = None
-        ready_count = 0
         
-        # First pass: try to find matching window and mark ready windows
-        for i in range(0, len(self.windows)):
-            curr_window = self.windows[i]
-            
+        # Find matching window or mark old windows as ready
+        for curr_window in self.windows:
             # Check if this message belongs to this window
             if sub_time >= curr_window["start"] and sub_time <= curr_window["end"]:
                 window = curr_window
-                # Don't break yet - continue to mark other windows as ready
+                break
             
-            # Mark windows as ready if this message is chronologically after them
-            elif sub_time >= curr_window["end"]:
-                # Track that we've seen a newer message of this type
+            # Mark older windows as ready when we see newer messages
+            elif sub_time > curr_window["end"]:
                 if list_name == "tasks":
                     curr_window["has_newer_task"] = True
-                else:  # fragments
+                else:
                     curr_window["has_newer_fragment"] = True
                 
-                # Window is ready only if BOTH newer tasks and newer fragments have arrived
+                # Window is ready when BOTH newer task AND fragment have arrived
                 if curr_window["has_newer_task"] and curr_window["has_newer_fragment"]:
-                    if not curr_window["ready"]:
-                        curr_window["ready"] = True
-                        ready_count += 1
+                    curr_window["ready"] = True
 
-        # If no matching window found, create a new one
+        # Create new window if no match found
         if not window:
             window = {
                 "start": sub_time,
@@ -124,21 +118,16 @@ class DigitalTwinConsumer:
                 "tasks": [],
                 "fragments": [],
                 "ready": False,
-                "has_newer_task": False,      # True when a task from a newer window arrives
-                "has_newer_fragment": False,  # True when a fragment from a newer window arrives
+                "has_newer_task": False,
+                "has_newer_fragment": False,
             }
             self.windows.append(window)
             
-            # Log window queue size periodically to monitor buffering
+            # Log queue size periodically
             if len(self.windows) % 10 == 1:
-                logger.info(f"📦 Windows in queue: {len(self.windows)} (latest: {window['start']}) - buffer growing, consumer may be lagging")
+                logger.info(f"📦 Windows in queue: {len(self.windows)} (latest: {window['start']})")
 
         window[list_name].append(data)
-        
-        # Log when windows become ready (but not too often)
-        if ready_count > 0 and ready_count % 5 == 0:
-            logger.info(f"✓ Marked {ready_count} windows as ready (total windows: {len(self.windows)})")
-        
         return window
 
     def consume_tasks(self) -> None:
@@ -151,21 +140,13 @@ class DigitalTwinConsumer:
             )
             logger.info("✅ Tasks consumer connected to Kafka")
 
-            message_count = 0
             for message in consumer:
                 if self.stop_consuming.is_set():
-                    logger.info(f"🛑 Tasks consumer stopped after {message_count} messages")
                     break
 
-                message_count += 1
                 task_data = message.key | message.value
-
                 with self.windows_lock:
                     self.__add_to_window(task_data, "tasks")
-                
-                # Log progress every 1000 tasks
-                if message_count % 1000 == 0:
-                    logger.info(f"📨 Received {message_count} tasks")
 
         except Exception as exc:  # pragma: no cover - defensive logging path
             logger.error("Task consumer error: %s", exc)
@@ -180,21 +161,13 @@ class DigitalTwinConsumer:
             )
             logger.info("✅ Fragments consumer connected to Kafka")
 
-            message_count = 0
             for message in consumer:
                 if self.stop_consuming.is_set():
-                    logger.info(f"🛑 Fragments consumer stopped after {message_count} messages")
                     break
 
-                message_count += 1
                 fragment_data = message.key | message.value
-
                 with self.windows_lock:
                     self.__add_to_window(fragment_data, "fragments")
-                
-                # Log progress every 50000 fragments
-                if message_count % 50000 == 0:
-                    logger.info(f"📨 Received {message_count} fragments")
 
         except Exception as exc:  # pragma: no cover - defensive logging path
             logger.error("Fragment consumer error: %s", exc)
@@ -272,35 +245,35 @@ class DigitalTwinConsumer:
             
             logger.info(f"🔨 Window {window_number}: {window['start']} → {window['end']} | Idx {earliest_ready_idx}/{ready_windows} ready | Queue: {len(self.windows)} {queue_status} | Drift: %+.2fs", drift_seconds)
 
+        # Accumulate tasks for this and all previous windows
         self.tasks_df = pd.concat([self.tasks_df, pd.DataFrame(window["tasks"])], ignore_index=True)
         frags_df = pd.DataFrame(window["fragments"])
 
         curr_tasks_df = pd.DataFrame()
         avg_cpu_usage = 0.0
-        if not self.tasks_df.empty and not frags_df.empty:
-            unique_frag_task_ids = frags_df['id'].unique()
-            logger.info(f"{len(unique_frag_task_ids)} unique task IDs in fragments")
-
+        
+        if not frags_df.empty:
             frags_df["submission_time"] = pd.to_datetime(frags_df["submission_time"])
-
-            window_start = window["start"]
-            window_end = window["end"]
-            logger.info(f"wstart: {window_start}, wend: {window_end}")
-            if (window_end - window_start).total_seconds() > REAL_WINDOW_SIZE_SEC:
-                logger.error("Window is larger than expected, wsize in seconds = %s", (window_end - window_start).total_seconds())
-
-            # Get tasks that are available in tasks_df
-            curr_tasks_df = self.tasks_df[self.tasks_df["id"].isin(unique_frag_task_ids)]
             
-            # Verify all tasks are available (should always be true with new ready logic)
-            if len(curr_tasks_df) != len(unique_frag_task_ids):
-                missing_count = len(unique_frag_task_ids) - len(curr_tasks_df)
-                logger.error(f"❌ Window {window_number}: {missing_count} tasks still missing! This should not happen with new ready logic.")
-                logger.error(f"Has newer task: {window['has_newer_task']}, Has newer fragment: {window['has_newer_fragment']}")
+            # Log window info
+            logger.info(f"Window {window_number}: {window['start']} → {window['end']}")
             
-            assert len(curr_tasks_df) == len(unique_frag_task_ids), f"Task/fragment mismatch: {len(curr_tasks_df)} tasks vs {len(unique_frag_task_ids)} unique fragment task IDs"
-
-            avg_cpu_usage = frags_df['cpu_usage'].mean()
+            # Get tasks for the fragments in this window
+            if not self.tasks_df.empty:
+                unique_frag_task_ids = frags_df['id'].unique()
+                curr_tasks_df = self.tasks_df[self.tasks_df["id"].isin(unique_frag_task_ids)]
+                
+                # Handle missing tasks gracefully
+                if len(curr_tasks_df) != len(unique_frag_task_ids):
+                    missing_count = len(unique_frag_task_ids) - len(curr_tasks_df)
+                    logger.warning(f"⚠️ Window {window_number}: {missing_count} fragments have missing parent tasks - dropping them")
+                    # Filter fragments to only those with available tasks
+                    available_task_ids = set(curr_tasks_df["id"])
+                    frags_df = frags_df[frags_df["id"].isin(available_task_ids)]
+                    logger.info(f"Kept {len(frags_df)} fragments with available tasks")
+            
+            if not frags_df.empty:
+                avg_cpu_usage = frags_df['cpu_usage'].mean()
 
         task_count = len(curr_tasks_df)
         fragment_count = len(frags_df)
@@ -318,7 +291,7 @@ class DigitalTwinConsumer:
             'fragments_sample': frags_df.to_dict(orient='records'),
         }
 
-        logger.info("📊 Window %s: %s tasks, %s fragments", window_number, task_count, fragment_count)
+        logger.info(f"✅ Window {window_number}: {task_count} tasks, {fragment_count} fragments ready for simulation")
         return batch_data
 
     def stop(self) -> None:

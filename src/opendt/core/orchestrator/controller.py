@@ -325,7 +325,8 @@ class OpenDTOrchestrator:
                 self.state["current_window"] = batch_data.get("window_info", "Processing...")
                 logger.info("🔄 Processing cycle %s", cycle)
 
-                baseline = self.run_simulation(batch_data)
+                window_number = batch_data.get("window_number")
+                baseline = self.run_simulation(batch_data, window_number=window_number)
 
                 timestamp = batch_data["window_end"].strftime("%Y-%m-%dT%H:%M:%SZ")
                 self._append_simulation_result(baseline, timestamp)
@@ -437,16 +438,23 @@ class OpenDTOrchestrator:
         except Exception as exc:  # pragma: no cover - defensive logging path
             logger.exception("Consumer error: %s", exc)
 
-    def run_simulation(self, batch_data: dict[str, Any], expName: str = "simple") -> dict[str, Any]:
+    def run_simulation(self, batch_data: dict[str, Any], expName: str = "simple", window_number: int | None = None) -> dict[str, Any]:
         logger.info("🔄 Running OpenDC simulation...")
         tasks_data = batch_data.get("tasks_sample", [])
         fragments_data = batch_data.get("fragments_sample", [])
         topology_data = self.state.get("current_topology")
+        
+        # Get window archive directory if in experiment mode
+        window_archive_dir = None
+        if self.data_collector and window_number is not None:
+            window_archive_dir = self.data_collector.get_window_dir(window_number)
+        
         results = self.opendc_runner.run_simulation(
             tasks_data=tasks_data,
             fragments_data=fragments_data,
             topology_data=topology_data,
             expName=expName,
+            window_archive_dir=window_archive_dir,
         )
         logger.info("📊 Simulation Results: %s", results)
         return results
@@ -456,8 +464,10 @@ class OpenDTOrchestrator:
         timestamps = self._simulation_timestamps()
         cpu_usages = [res.get("cpu_utilization") for res in results]
         power_usages = [res.get("energy_kwh") for res in results]
+        power_draws = [res.get("mean_power_draw_kw") for res in results]
         return {
             "cpu_usages": cpu_usages,
             "power_usages": power_usages,
+            "power_draws": power_draws,
             "timestamps": deepcopy(timestamps),
         }
