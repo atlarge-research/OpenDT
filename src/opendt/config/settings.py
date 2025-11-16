@@ -55,3 +55,40 @@ def kafka_bootstrap_servers() -> str:
 
 def openai_api_key() -> str | None:
     return os.environ.get("OPENAI_API_KEY")
+
+
+@dataclass(frozen=True)
+class ExperimentConfig:
+    experiment_mode: bool = False
+    enable_optimization: bool = True
+    experiment_name: str = "default"
+    output_path: str = "output/experiments"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "experiment_mode": self.experiment_mode,
+            "enable_optimization": self.enable_optimization,
+            "experiment_name": self.experiment_name,
+            "output_path": self.output_path,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any] | None) -> "ExperimentConfig":
+        """Coerce arbitrary payloads into a validated ExperimentConfig instance."""
+        data = data or {}
+        defaults = cls()
+
+        return cls(
+            experiment_mode=bool(data.get("experiment_mode", defaults.experiment_mode)),
+            enable_optimization=bool(data.get("enable_optimization", defaults.enable_optimization)),
+            experiment_name=str(data.get("experiment_name", defaults.experiment_name)),
+            output_path=str(data.get("output_path", defaults.output_path)),
+        )
+
+
+def experiment_config() -> ExperimentConfig:
+    """Load experiment configuration from config/experiment.json."""
+    from . import loaders
+    experiment_path = os.environ.get("OPENDT_EXPERIMENT_PATH", "/app/config/experiment.json")
+    data = loaders.read_experiment_config(experiment_path)
+    return ExperimentConfig.from_dict(data)

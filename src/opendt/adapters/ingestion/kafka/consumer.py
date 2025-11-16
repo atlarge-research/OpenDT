@@ -23,7 +23,7 @@ def kafka_serializer(message: bytes) -> Dict:
 class DigitalTwinConsumer:
     """Consumes tasks and fragments from Kafka and creates processing windows."""
 
-    def __init__(self, bootstrap_servers: str, kafka_group_id: str) -> None:
+    def __init__(self, bootstrap_servers: str, kafka_group_id: str, experiment_mode: bool = False) -> None:
         self.bootstrap_servers = bootstrap_servers
         self.tasks_buffer: Deque = deque(maxlen=2000)
         self.tasks_df = pd.DataFrame()
@@ -32,9 +32,14 @@ class DigitalTwinConsumer:
         self.kafka_group_id = kafka_group_id
         self.tasks_lock = threading.Lock()
         self.fragments_lock = threading.Lock()
+        self.experiment_mode = experiment_mode
 
         self.windows_lock = threading.Condition()
-        self.windows: Deque = deque(maxlen=50)
+        # Use unbounded deque in experiment mode to prevent window drops
+        if experiment_mode:
+            self.windows: Deque = deque()
+        else:
+            self.windows: Deque = deque(maxlen=50)
 
     def process_windows(self):
         logger.info("📥 Starting Kafka consumers...")

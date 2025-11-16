@@ -69,3 +69,22 @@ def backup_slo(path: str) -> None:
 
 def slo_mtime(path: str) -> float:
     return Path(path).stat().st_mtime if os.path.exists(path) else 0.0
+
+
+def read_experiment_config(path: str) -> dict[str, Any] | None:
+    if not os.path.exists(path):
+        logger.info("⚠️ Experiment configuration not found; defaults will be used")
+        return None
+    return _read_json(path)
+
+
+def write_experiment_config(path: str, config: dict[str, Any]) -> None:
+    _write_json(path, config)
+
+
+def backup_experiment_config(path: str) -> None:
+    _backup_json(path)
+
+
+def experiment_config_mtime(path: str) -> float:
+    return Path(path).stat().st_mtime if os.path.exists(path) else 0.0

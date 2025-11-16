@@ -18,6 +18,7 @@ from ...config.settings import (
     SLOTargets,
     kafka_bootstrap_servers,
     openai_api_key,
+    experiment_config,
 )
 from ...adapters.ingestion.kafka.consumer import DigitalTwinConsumer
 from ...adapters.ingestion.kafka.producer import TimedKafkaProducer
@@ -26,6 +27,7 @@ from .state import SimulationResultsBuffer, default_state_dict
 from ..simulation.runner import OpenDCRunner
 from .topology import topology_hash, watch_topology_file
 from .slo import slo_hash, watch_slo_file
+from ..experiment import ExperimentDataCollector
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +37,15 @@ class OpenDTOrchestrator:
         self.kafka_servers = kafka_bootstrap_servers()
         self.openai_key = openai_api_key()
         self.slo_targets: dict[str, float] = SLOTargets().to_dict()
+        
+        # Load experiment configuration
+        self.experiment_config = experiment_config()
+        self.enable_optimization = self.experiment_config.enable_optimization
 
         self.state = default_state_dict()
         self.state["slo_targets"] = dict(self.slo_targets)
+        self.state["experiment_mode"] = self.experiment_config.experiment_mode
+        self.state["enable_optimization"] = self.enable_optimization
 
         self.open_dc_buffer = SimulationResultsBuffer()
 
@@ -49,6 +57,15 @@ class OpenDTOrchestrator:
         self.stop_event = threading.Event()
         self.producer_thread: threading.Thread | None = None
         self.consumer_thread: threading.Thread | None = None
+
+        # Initialize experiment data collector if in experiment mode
+        self.data_collector: ExperimentDataCollector | None = None
+        if self.experiment_config.experiment_mode:
+            self.data_collector = ExperimentDataCollector(
+                experiment_name=self.experiment_config.experiment_name,
+                output_path=self.experiment_config.output_path
+            )
+            logger.info("📊 Experiment mode enabled: data will be collected to parquet")
 
         self.topology_path = "/app/config/topology.json"
         self.slo_template_path = Path(__file__).resolve().parents[4] / "config" / "slo.json"
@@ -171,17 +188,28 @@ class OpenDTOrchestrator:
 
     def start_system(self) -> None:
         logger.info("🚀 Starting OpenDT Digital Twin System")
+        if self.experiment_config.experiment_mode:
+            logger.info("📊 Experiment mode: ENABLED")
+        if not self.enable_optimization:
+            logger.info("🔧 Optimization: DISABLED")
+        
         self.state["status"] = "starting"
         self.stop_event.clear()
 
         try:
             self.producer = TimedKafkaProducer(self.kafka_servers)
-            self.consumer = DigitalTwinConsumer(self.kafka_servers, "OpenDT_telemetry")
+            self.consumer = DigitalTwinConsumer(
+                self.kafka_servers,
+                "OpenDT_telemetry",
+                experiment_mode=self.experiment_config.experiment_mode
+            )
 
             self.consumer_thread = threading.Thread(target=self.run_consumer, daemon=False)
             self.consumer_thread.start()
 
-            time.sleep(5)
+            # Give consumer threads time to connect and initialize Kafka topics
+            logger.info("⏳ Waiting for consumer to initialize...")
+            time.sleep(8)
 
             self.producer_thread = threading.Thread(target=self.run_producer, daemon=False)
             self.producer_thread.start()
@@ -208,6 +236,12 @@ class OpenDTOrchestrator:
 
         if self.consumer_thread and self.consumer_thread.is_alive():
             self.consumer_thread.join(timeout=5)
+
+        # Finalize experiment data collection
+        if self.data_collector:
+            filepath = self.data_collector.finalize()
+            if filepath:
+                logger.info(f"📊 Experiment data saved to: {filepath}")
 
         self.state["status"] = "stopped"
         logger.info("✅ System stopped")
@@ -310,52 +344,89 @@ class OpenDTOrchestrator:
                 tries = 0
                 deadline = time.monotonic() + WINDOW_TRY_BUDGET_SEC
 
-                while (
-                    time.monotonic() < deadline
-                    and tries < MAX_TRIES_PER_WINDOW
-                    and not self.stop_event.is_set()
-                ):
-                    tries += 1
-                    opt = self.optimizer.optimize(
-                        baseline,
-                        batch_data,
-                        self.slo_targets,
-                        current_topology=best_topology,
-                    )
+                # Skip optimization if disabled
+                if self.enable_optimization:
+                    while (
+                        time.monotonic() < deadline
+                        and tries < MAX_TRIES_PER_WINDOW
+                        and not self.stop_event.is_set()
+                    ):
+                        tries += 1
+                        opt = self.optimizer.optimize(
+                            baseline,
+                            batch_data,
+                            self.slo_targets,
+                            current_topology=best_topology,
+                        )
 
-                    proposed = opt.get("new_topology")
-                    if not proposed:
-                        continue
-                    topo_hash = self._topo_hash(proposed)
-                    if topo_hash in seen:
-                        continue
-                    seen.add(topo_hash)
+                        proposed = opt.get("new_topology")
+                        if not proposed:
+                            continue
+                        topo_hash = self._topo_hash(proposed)
+                        if topo_hash in seen:
+                            continue
+                        seen.add(topo_hash)
 
-                    probe = self.opendc_runner.run_simulation(
-                        tasks_data=batch_data.get("tasks_sample", []),
-                        fragments_data=batch_data.get("fragments_sample", []),
-                        topology_data=proposed,
-                        expName=f"window_{cycle}_try_{tries}",
-                    )
+                        probe = self.opendc_runner.run_simulation(
+                            tasks_data=batch_data.get("tasks_sample", []),
+                            fragments_data=batch_data.get("fragments_sample", []),
+                            topology_data=proposed,
+                            expName=f"window_{cycle}_try_{tries}",
+                        )
 
-                    self.state["last_optimization"] = opt
-                    self.state["last_optimization"]["energy_kwh"] = probe.get("energy_kwh", None)
-                    self.state["last_optimization"]["runtime_hours"] = probe.get("runtime_hours", None)
-                    self.state["last_optimization"]["cpu_utilization"] = probe.get("cpu_utilization", None)
-                    self.state["last_optimization"]["max_power_draw"] = probe.get("max_power_draw", None)
+                        self.state["last_optimization"] = opt
+                        self.state["last_optimization"]["energy_kwh"] = probe.get("energy_kwh", None)
+                        self.state["last_optimization"]["runtime_hours"] = probe.get("runtime_hours", None)
+                        self.state["last_optimization"]["cpu_utilization"] = probe.get("cpu_utilization", None)
+                        self.state["last_optimization"]["max_power_draw"] = probe.get("max_power_draw", None)
 
-                    self.state["cycle_count_opt"] += 1
-                    score = self._score(probe)
-                    if score < best_score - IMPROVEMENT_DELTA:
-                        best_topology, best_score = proposed, score
-                        self.state["window_best_score"] = round(best_score, 3)
+                        self.state["cycle_count_opt"] += 1
+                        score = self._score(probe)
+                        if score < best_score - IMPROVEMENT_DELTA:
+                            best_topology, best_score = proposed, score
+                            self.state["window_best_score"] = round(best_score, 3)
 
-                    self.state["window_trials"] = tries
+                        self.state["window_trials"] = tries
+                else:
+                    # Optimization disabled by experiment config
+                    self.state["last_optimization"] = {
+                        "enabled": False,
+                        "reason": "Disabled by experiment config"
+                    }
 
                 self.state["best_config"] = {
                     "config": best_topology,
                     "score": round(best_score, 3),
                 }
+
+                # Collect experiment data if in experiment mode
+                if self.data_collector:
+                    window_data = {
+                        'window_number': cycle,
+                        'window_start': batch_data.get('window_start'),
+                        'window_end': batch_data.get('window_end'),
+                        'task_count': batch_data.get('task_count'),
+                        'fragment_count': batch_data.get('fragment_count'),
+                        'avg_cpu_usage': batch_data.get('avg_cpu_usage'),
+                        'baseline_energy_kwh': baseline.get('energy_kwh'),
+                        'baseline_runtime_hours': baseline.get('runtime_hours'),
+                        'baseline_cpu_utilization': baseline.get('cpu_utilization'),
+                        'baseline_max_power_draw': baseline.get('max_power_draw'),
+                        'baseline_score': baseline_score,
+                        'baseline_topology': self.state.get('current_topology'),
+                        'optimization_enabled': self.enable_optimization,
+                        'slo_targets': self.slo_targets,
+                    }
+                    
+                    # Add optimization results if optimization was enabled
+                    if self.enable_optimization and tries > 0:
+                        window_data['optimization_score'] = best_score
+                        window_data['optimization_topology'] = best_topology
+                        if self.state.get('last_optimization'):
+                            window_data['optimization_energy_kwh'] = self.state['last_optimization'].get('energy_kwh')
+                            window_data['optimization_runtime_hours'] = self.state['last_optimization'].get('runtime_hours')
+                    
+                    self.data_collector.record_window(window_data)
 
                 if self.stop_event.wait(0.1):
                     break

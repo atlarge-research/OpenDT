@@ -5,8 +5,8 @@ from pathlib import Path
 
 from flask import Flask
 
+from .logging import configure_logging  # noqa: F401  # ensures logging is configured FIRST
 from .api.routes import api_bp, ui_bp
-from .logging import configure_logging  # noqa: F401  # ensures logging is configured
 
 
 def create_app() -> Flask:
