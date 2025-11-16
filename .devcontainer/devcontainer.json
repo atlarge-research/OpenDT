@@ -10,7 +10,7 @@
   "overrideCommand": true,
 
   "containerEnv": {
-    "OPENAI_API_KEY": "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"  },
+    "OPENAI_API_KEY": ""  },
 
   "forwardPorts": [8080, 29092,8010,5500],
 
