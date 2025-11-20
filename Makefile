@@ -1,0 +1,192 @@
+.PHONY: up down clean-volumes restart build logs help run test setup install-dev clean-env verify
+
+# Default target
+.DEFAULT_GOAL := help
+
+# Configuration file path (can be overridden: make up config=config/custom.yaml)
+config ?= ./config/default.yaml
+
+# Virtual environment detection
+VENV := .venv
+PYTHON := $(VENV)/bin/python
+PYTEST := $(VENV)/bin/pytest
+UV := $(shell command -v uv 2> /dev/null)
+
+## up: Stop containers, delete volumes (clean slate), and start fresh
+up: clean-volumes
+	@echo "🚀 Starting OpenDT services with clean slate..."
+	@echo "📋 Using config: $(config)"
+	@if [ ! -f "$(config)" ]; then \
+		echo "❌ Error: Config file not found: $(config)"; \
+		exit 1; \
+	fi
+	CONFIG_PATH=$(config) docker compose up -d
+	@echo "✅ Services started!"
+	@echo ""
+	@echo "Available services:"
+	@echo "  - Frontend:    http://localhost:3000"
+	@echo "  - API:         http://localhost:8000"
+	@echo "  - API Docs:    http://localhost:8000/docs"
+	@echo "  - Postgres:    localhost:5432"
+	@echo "  - Kafka:       localhost:9092"
+	@echo ""
+	@echo "View logs: make logs"
+
+## run: Alias for 'up' (accepts config parameter)
+run: up
+
+## down: Stop all containers
+down:
+	@echo "⏹️  Stopping OpenDT services..."
+	CONFIG_PATH=$(config) docker compose down
+	@echo "✅ Services stopped!"
+
+## clean-volumes: Stop containers and delete persistent volumes (Kafka & Postgres)
+clean-volumes:
+	@echo "🧹 Stopping containers and cleaning persistent volumes..."
+	CONFIG_PATH=$(config) docker compose down -v
+	@echo "🗑️  Removing named volumes..."
+	-docker volume rm opendt-postgres-data 2>/dev/null || true
+	-docker volume rm opendt-kafka-data 2>/dev/null || true
+	@echo "✅ Clean slate ready!"
+
+## restart: Restart all services (without cleaning volumes)
+restart:
+	@echo "♻️  Restarting OpenDT services..."
+	CONFIG_PATH=$(config) docker compose restart
+	@echo "✅ Services restarted!"
+
+## build: Rebuild all Docker images
+build:
+	@echo "🔨 Building Docker images..."
+	CONFIG_PATH=$(config) docker compose build --no-cache
+	@echo "✅ Images built!"
+
+## rebuild: Clean, rebuild, and start
+rebuild: clean-volumes build up
+
+## setup: Create virtual environment and install all dependencies
+setup:
+	@echo "🔧 Setting up development environment..."
+	@if [ -z "$(UV)" ]; then \
+		echo "❌ uv not found. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		exit 1; \
+	fi
+	@echo "Creating virtual environment with uv..."
+	uv venv
+	@echo "Installing dependencies..."
+	uv pip install -e libs/common
+	uv pip install -e "libs/common[test]"
+	uv pip install -e ".[dev]"
+	@echo "✅ Development environment ready!"
+	@echo ""
+	@echo "Activate with: source .venv/bin/activate"
+
+## install-dev: Install dependencies in existing venv (for CI or manual setup)
+install-dev:
+	@echo "📦 Installing development dependencies..."
+	@if [ ! -d "$(VENV)" ]; then \
+		echo "❌ Virtual environment not found. Run 'make setup' first."; \
+		exit 1; \
+	fi
+	$(PYTHON) -m pip install -e libs/common
+	$(PYTHON) -m pip install -e "libs/common[test]"
+	$(PYTHON) -m pip install -e ".[dev]"
+	@echo "✅ Dependencies installed!"
+
+## test: Run tests for shared library
+test:
+	@echo "🧪 Running tests..."
+	@if [ ! -d "$(VENV)" ]; then \
+		echo "Virtual environment not found. Running 'make setup'..."; \
+		$(MAKE) setup; \
+	fi
+	@if [ ! -f "$(PYTEST)" ]; then \
+		echo "pytest not found. Running 'make install-dev'..."; \
+		$(MAKE) install-dev; \
+	fi
+	$(PYTEST) libs/common/tests/ -v --tb=short
+	@echo "✅ Tests passed!"
+
+## clean-env: Remove virtual environment
+clean-env:
+	@echo "🧹 Removing virtual environment..."
+	rm -rf $(VENV)
+	rm -rf .uv
+	@echo "✅ Environment cleaned!"
+
+## verify: Verify development environment setup
+verify:
+	@echo "🔍 Verifying development environment..."
+	@if [ ! -d "$(VENV)" ]; then \
+		echo "❌ Virtual environment not found. Run 'make setup' first."; \
+		exit 1; \
+	fi
+	@$(PYTHON) scripts/verify_setup.py
+
+## logs: Tail logs for all services
+logs:
+	CONFIG_PATH=$(config) docker compose logs -f
+
+## logs-api: Tail logs for API service only
+logs-api:
+	CONFIG_PATH=$(config) docker compose logs -f opendt-api
+
+## logs-frontend: Tail logs for frontend service only
+logs-frontend:
+	CONFIG_PATH=$(config) docker compose logs -f frontend
+
+## logs-kafka: Tail logs for Kafka service only
+logs-kafka:
+	CONFIG_PATH=$(config) docker compose logs -f kafka
+
+## logs-dc-mock: Tail logs for dc-mock service only
+logs-dc-mock:
+	CONFIG_PATH=$(config) docker compose logs -f dc-mock
+
+## logs-sim-worker: Tail logs for sim-worker service only
+logs-sim-worker:
+	CONFIG_PATH=$(config) docker compose logs -f sim-worker
+
+## ps: Show running containers
+ps:
+	CONFIG_PATH=$(config) docker compose ps
+
+## shell-api: Open a shell in the API container
+shell-api:
+	CONFIG_PATH=$(config) docker compose exec opendt-api /bin/bash
+
+## shell-frontend: Open a shell in the frontend container
+shell-frontend:
+	CONFIG_PATH=$(config) docker compose exec frontend /bin/sh
+
+## shell-postgres: Open psql in the Postgres container
+shell-postgres:
+	CONFIG_PATH=$(config) docker compose exec postgres psql -U opendt -d opendt
+
+## kafka-topics: List Kafka topics
+kafka-topics:
+	CONFIG_PATH=$(config) docker compose exec kafka kafka-topics --bootstrap-server localhost:9092 --list
+
+## kafka-create-topic: Create a Kafka topic (usage: make kafka-create-topic TOPIC=my-topic)
+kafka-create-topic:
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "❌ Error: TOPIC variable is required. Usage: make kafka-create-topic TOPIC=my-topic"; \
+		exit 1; \
+	fi
+	CONFIG_PATH=$(config) docker compose exec kafka kafka-topics --bootstrap-server localhost:9092 --create --topic $(TOPIC) --partitions 3 --replication-factor 1
+
+## kafka-consume: Consume messages from a topic (usage: make kafka-consume TOPIC=my-topic)
+kafka-consume:
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "❌ Error: TOPIC variable is required. Usage: make kafka-consume TOPIC=my-topic"; \
+		exit 1; \
+	fi
+	CONFIG_PATH=$(config) docker compose exec kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic $(TOPIC) --from-beginning
+
+## help: Show this help message
+help:
+	@echo "OpenDT Makefile Commands"
+	@echo "========================"
+	@echo ""
+	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'

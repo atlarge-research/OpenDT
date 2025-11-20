@@ -1,0 +1,8 @@
+workload: "SURF"
+
+simulation:
+  speed_factor: 10.0  # 1.0 = Realtime, -1 = Max Speed
+  window_size_minutes: 5
+
+features:
+  calibration_enabled: false
