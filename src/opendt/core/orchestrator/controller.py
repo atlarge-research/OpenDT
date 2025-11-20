@@ -10,6 +10,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from ...config import loaders
 from ...config.settings import (
     IMPROVEMENT_DELTA,
@@ -204,16 +206,11 @@ class OpenDTOrchestrator:
             self.consumer = DigitalTwinConsumer(
                 self.kafka_servers,
                 "OpenDT_telemetry",
-                experiment_mode=self.experiment_config.experiment_mode,
                 fast_mode=self.experiment_config.fast_mode
             )
 
             self.consumer_thread = threading.Thread(target=self.run_consumer, daemon=False)
             self.consumer_thread.start()
-
-            # Give consumer threads time to connect and initialize Kafka topics
-            logger.info("⏳ Waiting for consumer to initialize...")
-            time.sleep(8)
 
             self.producer_thread = threading.Thread(target=self.run_producer, daemon=False)
             self.producer_thread.start()
@@ -328,7 +325,8 @@ class OpenDTOrchestrator:
                 window_number = batch_data.get("window_number")
                 baseline = self.run_simulation(batch_data, window_number=window_number)
 
-                timestamp = batch_data["window_end"].strftime("%Y-%m-%dT%H:%M:%SZ")
+                # Use window_start as the timestamp for consistency
+                timestamp = batch_data["window_start"].strftime("%Y-%m-%dT%H:%M:%SZ")
                 self._append_simulation_result(baseline, timestamp)
 
                 self.state["last_simulation"] = baseline
@@ -348,6 +346,11 @@ class OpenDTOrchestrator:
                 seen = {self._topo_hash(best_topology) if best_topology else ""}
                 tries = 0
                 deadline = time.monotonic() + WINDOW_TRY_BUDGET_SEC
+                
+                # Get window archive directory for optimization attempts if in experiment mode
+                window_archive_dir = None
+                if self.data_collector and window_number is not None:
+                    window_archive_dir = self.data_collector.get_window_dir(window_number)
 
                 # Skip optimization if disabled
                 if self.enable_optimization:
@@ -377,6 +380,7 @@ class OpenDTOrchestrator:
                             fragments_data=batch_data.get("fragments_sample", []),
                             topology_data=proposed,
                             expName=f"window_{cycle}_try_{tries}",
+                            window_archive_dir=window_archive_dir,
                         )
 
                         self.state["last_optimization"] = opt
@@ -433,8 +437,6 @@ class OpenDTOrchestrator:
                     
                     self.data_collector.record_window(window_data)
 
-                if self.stop_event.wait(0.1):
-                    break
         except Exception as exc:  # pragma: no cover - defensive logging path
             logger.exception("Consumer error: %s", exc)
 
@@ -443,6 +445,20 @@ class OpenDTOrchestrator:
         tasks_data = batch_data.get("tasks_sample", [])
         fragments_data = batch_data.get("fragments_sample", [])
         topology_data = self.state.get("current_topology")
+        
+        # Debug: Show what's being sent to OpenDC
+        if tasks_data:
+            tasks_df = pd.DataFrame(tasks_data)
+            tasks_df['submission_time_dt'] = pd.to_datetime(tasks_df['submission_time'])
+            task_time_min = tasks_df['submission_time_dt'].min()
+            task_time_max = tasks_df['submission_time_dt'].max()
+            task_time_span = (task_time_max - task_time_min).total_seconds() / 3600  # hours
+            logger.debug(f"🔍 Sending to OpenDC: {len(tasks_data)} tasks, {len(fragments_data)} fragments")
+            logger.debug(f"🔍 Task time range: {task_time_min} to {task_time_max} (span: {task_time_span:.2f} hours)")
+            if window_number:
+                window_start = batch_data.get('window_start')
+                window_end = batch_data.get('window_end')
+                logger.debug(f"🔍 Window {window_number} boundaries: {window_start} → {window_end}")
         
         # Get window archive directory if in experiment mode
         window_archive_dir = None

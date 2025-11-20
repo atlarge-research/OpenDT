@@ -1,6 +1,7 @@
 services:
   opendt:
-    entrypoint: ["python", "-u", "-m", "opendt.cli"]
+    entrypoint: ["python", "-u", "-m", "opendt.cli"]  # Commented out for interactive mode
+    # command: sleep infinity
     environment:
       - OPENDT_DATA_DIR=/app/data
       - OPENDT_SIM_DIR=/app/output/opendt-simulation/raw-output
